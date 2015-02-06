@@ -1,37 +1,110 @@
-// ch01.cpp : Defines the entry point for the console application.
-//
-//////////////////////////////////////////////////////////
-//  triangles.cpp  from the OpenGL Red Book   Chapter 1
-//////////////////////////////////////////////////////////
+/*
+Rahul Pradeep Kamath
+Assignment 1 
+CS 433/533
+*/
 
+#include <iomanip>
 #include <iostream>
 using namespace std;
 
 #include "vgl.h"
 #include "LoadShaders.h"
 
-int displaySecondTriangle = 1, displayFirstTriangle=1;
+int displaySecondTriangle = 1, displayFirstTriangle = 1;
 //enum VAO_IDs { Triangles, NumVAOs };
-const GLuint Triangles = 0, NumVAOs = 2;
+const GLuint Triangles = 0, NumVAOs = 3;
 //enum Buffer_IDs { ArrayBuffer, NumBuffers };
-const GLuint ArrayBuffer = 0, NumBuffers = 2;
+const GLuint ArrayBuffer = 0, NumBuffers = 3;// one for the 2 Triangles , 1 for colourful triangle , 1 for circle
 //enum Attrib_IDs { vPosition = 0 };
 const GLuint vPosition = 0;
 const GLuint vPosition1 = 1;
-GLuint program, program1;
+const GLuint vPosition2 = 2;
+GLuint program, program1,program2;
 GLuint VAOs[NumVAOs];
 GLuint Buffers[NumBuffers];
 
+// Variables for Circle
+GLfloat **verticesCircle;
+GLuint numberOfTriangles;
+GLfloat radius;
+GLuint verticesRequired;
+const float PI = 3.14159;
+//
 const GLuint NumVertices = 6;
 int wireMode = 1;
+int circleEnabled = 0;
 
+// Dynamic allocation Of Matrix based On user Inputs
+void allocateMatrix()
+{
+	GLfloat *vals;
+	vals = (GLfloat*)malloc(verticesRequired * 2 * sizeof(GLfloat));
+	verticesCircle = (GLfloat**)malloc(verticesRequired * sizeof(GLfloat*));
+	for (int i = 0; i < verticesRequired; i++)
+	{
+		verticesCircle[i] = &(vals[i * 2]);
+	}
+	for (int i = 0; i < verticesRequired; i++)
+	{
+		verticesCircle[i][0] = 0.0f;
+		verticesCircle[i][1] = 0.0f;
+	}
+}
+
+// KeyBoard Callback Fwd Declaration
 static void special(unsigned char key, int x_cord, int y_cord);
-/////////////////////////////////////////////////////
-//  int
-/////////////////////////////////////////////////////
+
+void createCircleData()
+{
+	circleEnabled = 1;
+	glBindVertexArray(VAOs[2]);
+	verticesRequired = 3 + (numberOfTriangles - 1); // 1 Vertex is common [0,0] , the 1st triangle needs 2 Vertices apart from [0,0] and the other triangles need 1 vertice .
+	GLfloat incrementValue = ceil(360 / numberOfTriangles);
+	cout << endl << " User Entered Radius " << radius << " Triangles " << numberOfTriangles << "Vertices Required " << verticesRequired
+		<< " Increment Value " << incrementValue << endl;
+	allocateMatrix();
+	int rowCount = 1;
+	for (int i = 0; i <= 360; i = i + incrementValue)
+	{
+		cout << endl << " I " << i;
+		GLfloat x = radius*sin((i*PI) / 180);
+		GLfloat y = radius*cos((i*PI) / 180);
+		verticesCircle[rowCount][0] = x;
+		verticesCircle[rowCount][1] = y;
+		rowCount++;
+	}
+	/*cout << " X : " << verticesCircle[0][0] << " Y : " << verticesCircle[0][1] << endl;
+	rowCount = 1;
+	for (int i = 1; i < 360; i = i + incrementValue)
+	{
+		cout << " X : " << verticesCircle[rowCount][0] << " Y : " << verticesCircle[rowCount][1] << endl;
+		rowCount++;
+	}*/
+	
+	glBindBuffer(GL_ARRAY_BUFFER, Buffers[2]);
+	glBufferData(GL_ARRAY_BUFFER, (verticesRequired * 2 * sizeof(GLfloat)), *verticesCircle, GL_DYNAMIC_DRAW);
+	ShaderInfo  shaders2[] = {
+		{ GL_VERTEX_SHADER, "circles.vert" },
+		{ GL_FRAGMENT_SHADER, "circles.frag" },
+		{ GL_NONE, NULL }
+	};
+
+	program2 = LoadShaders(shaders2);
+	glUseProgram(program2);
+
+	glVertexAttribPointer(vPosition2, 2, GL_FLOAT, GL_FALSE, 0, BUFFER_OFFSET(0));
+	glEnableVertexAttribArray(vPosition2);
+	
+}
+// Initialization
 void init(void)
 {
 	glGenVertexArrays(NumVAOs, VAOs);
+	/*for (int i = 0; i < NumVAOs; i++)
+	{
+		cout << endl << "VAO " << i << " :" << VAOs[i];
+	}*/
 	glBindVertexArray(VAOs[Triangles]);
 	glMatrixMode(GL_PROJECTION);
 	//glLoadIdentity();
@@ -44,6 +117,10 @@ void init(void)
 		{ -0.85f, 0.90f } };
 
 	glGenBuffers(NumBuffers, Buffers);
+	/*for (int i = 0; i < NumBuffers; i++)
+	{
+		cout << endl << "Buffer Name " << i << " :" << Buffers[i];
+	}*/
 	glBindBuffer(GL_ARRAY_BUFFER, Buffers[ArrayBuffer]);
 	glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
 
@@ -81,12 +158,14 @@ void init(void)
 	glVertexAttribPointer(vPosition1, 2, GL_FLOAT, GL_FALSE, 0, BUFFER_OFFSET(0));
 	glEnableVertexAttribArray(vPosition1);
 
+
+	
 }
 static void special(unsigned char key, int x_cord, int y_cord){
 	cout << key;
 	switch (key) {
 
-	case 'x' :
+	case 'x': // Display FirstTriangle
 		if (displayFirstTriangle)
 		{
 			displayFirstTriangle = 0;
@@ -95,14 +174,14 @@ static void special(unsigned char key, int x_cord, int y_cord){
 		{
 			displayFirstTriangle = 1;
 		}
-	case 's' :
-			glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
-			break;
-	case 'w':
+	case 's': // Shaded Mode
+		glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
+		break;
+	case 'w': // WireFrame Mode
 		glLineWidth(1);
 		glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
 		break;
-	case 'y':
+	case 'y': // Toggle Second colorful triangle
 		if (displaySecondTriangle)
 		{
 			displaySecondTriangle = 0;
@@ -112,6 +191,31 @@ static void special(unsigned char key, int x_cord, int y_cord){
 			displaySecondTriangle = 1;
 		}
 		break;
+	case 'g' : // Generate Circle
+		cout << endl << " Enter Radius :: ";
+		cin >> radius;
+		cout << endl << " Enter Number Of Triangle Steps :: " << endl;
+		cin >> numberOfTriangles;
+		
+		createCircleData();
+		break;
+	case 'z' : //  Toggle Circle
+		if (circleEnabled)
+		{
+			circleEnabled = 0;
+		}
+		else
+		{
+			circleEnabled = 1;
+		}
+		break;
+	case 'q' : // Q ,  Quit
+			exit(0);
+			break;
+	case 27: // Escape Key
+			exit(0);
+			break;
+		
 	default: return;
 	}
 	glutPostRedisplay();
@@ -122,7 +226,7 @@ static void special(unsigned char key, int x_cord, int y_cord){
 void display(void)
 {
 	glClear(GL_COLOR_BUFFER_BIT);
-	
+
 	if (displayFirstTriangle)
 	{
 		glBindVertexArray(VAOs[Triangles]);
@@ -139,6 +243,15 @@ void display(void)
 		glUseProgram(program1);
 		glEnableVertexAttribArray(vPosition1);
 		glDrawArrays(GL_TRIANGLES, 0, 3);
+	}
+	// Circle
+	if (circleEnabled)
+	{
+		glBindVertexArray(VAOs[2]);
+		glBindBuffer(GL_ARRAY_BUFFER, Buffers[2]);
+		glUseProgram(program2);
+		glEnableVertexAttribArray(vPosition2);
+		glDrawArrays(GL_TRIANGLE_FAN, 0, verticesRequired);
 	}
 
 	glFlush();
