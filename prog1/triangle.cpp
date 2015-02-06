@@ -1,6 +1,6 @@
 /*
 Rahul Pradeep Kamath
-Assignment 1 
+Assignment 1
 CS 433/533
 */
 
@@ -20,10 +20,11 @@ const GLuint ArrayBuffer = 0, NumBuffers = 3;// one for the 2 Triangles , 1 for 
 const GLuint vPosition = 0;
 const GLuint vPosition1 = 1;
 const GLuint vPosition2 = 2;
-GLuint program, program1,program2;
+const GLuint vertexColor = 3;
+GLuint program, program1, program2;
 GLuint VAOs[NumVAOs];
 GLuint Buffers[NumBuffers];
-
+GLuint BufferColour[1];
 // Variables for Circle
 GLfloat **verticesCircle;
 GLuint numberOfTriangles;
@@ -60,12 +61,12 @@ void createCircleData()
 	circleEnabled = 1;
 	glBindVertexArray(VAOs[2]);
 	verticesRequired = 3 + (numberOfTriangles - 1); // 1 Vertex is common [0,0] , the 1st triangle needs 2 Vertices apart from [0,0] and the other triangles need 1 vertice .
-	GLfloat incrementValue = (GLfloat)360 / (GLfloat)numberOfTriangles;
+	GLdouble incrementValue = (GLdouble)360 / (GLdouble)numberOfTriangles;
 	/*cout << endl << " User Entered Radius " << radius << " Triangles " << numberOfTriangles << "Vertices Required " << verticesRequired
-		<< " Increment Value " << incrementValue << endl;*/
+	<< " Increment Value " << incrementValue << endl;*/
 	allocateMatrix();
 	int rowCount = 1;
-	for (GLfloat i = 0; i <= 360; i = i + incrementValue)
+	for (GLdouble i = 0; i <= 360; i = i + incrementValue)
 	{
 		GLfloat x = radius*sin((i*PI) / 180);
 		GLfloat y = radius*cos((i*PI) / 180);
@@ -77,10 +78,10 @@ void createCircleData()
 	rowCount = 1;
 	for (int i = 1; i < 360; i = i + incrementValue)
 	{
-		cout << " X : " << verticesCircle[rowCount][0] << " Y : " << verticesCircle[rowCount][1] << endl;
-		rowCount++;
+	cout << " X : " << verticesCircle[rowCount][0] << " Y : " << verticesCircle[rowCount][1] << endl;
+	rowCount++;
 	}*/
-	
+
 	glBindBuffer(GL_ARRAY_BUFFER, Buffers[2]);
 	glBufferData(GL_ARRAY_BUFFER, (verticesRequired * 2 * sizeof(GLfloat)), *verticesCircle, GL_DYNAMIC_DRAW);
 	ShaderInfo  shaders2[] = {
@@ -94,7 +95,7 @@ void createCircleData()
 
 	glVertexAttribPointer(vPosition2, 2, GL_FLOAT, GL_FALSE, 0, BUFFER_OFFSET(0));
 	glEnableVertexAttribArray(vPosition2);
-	
+
 }
 // Initialization
 void init(void)
@@ -102,7 +103,7 @@ void init(void)
 	glGenVertexArrays(NumVAOs, VAOs);
 	/*for (int i = 0; i < NumVAOs; i++)
 	{
-		cout << endl << "VAO " << i << " :" << VAOs[i];
+	cout << endl << "VAO " << i << " :" << VAOs[i];
 	}*/
 	glBindVertexArray(VAOs[Triangles]);
 	glMatrixMode(GL_PROJECTION);
@@ -116,9 +117,10 @@ void init(void)
 		{ -0.85f, 0.90f } };
 
 	glGenBuffers(NumBuffers, Buffers);
+	
 	/*for (int i = 0; i < NumBuffers; i++)
 	{
-		cout << endl << "Buffer Name " << i << " :" << Buffers[i];
+	cout << endl << "Buffer Name " << i << " :" << Buffers[i];
 	}*/
 	glBindBuffer(GL_ARRAY_BUFFER, Buffers[ArrayBuffer]);
 	glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
@@ -143,8 +145,14 @@ void init(void)
 		{ -0.5f, -0.5f },
 		{ 0.5f, -0.5f }
 	};
+	GLfloat verticesColour[3][3] = {
+		{ 1.0f, 0.0f, 0.0f },	// Triangle 3
+		{ 0.0f, 1.0f, 0.0f },
+		{ 0.0f, 0.0f, 1.0f }
+	};
 	glBindBuffer(GL_ARRAY_BUFFER, Buffers[1]);
 	glBufferData(GL_ARRAY_BUFFER, sizeof(vertices2), vertices2, GL_STATIC_DRAW);
+	
 	ShaderInfo  shaders1[] = {
 		{ GL_VERTEX_SHADER, "triangles1.vert" },
 		{ GL_FRAGMENT_SHADER, "triangles1.frag" },
@@ -157,8 +165,11 @@ void init(void)
 	glVertexAttribPointer(vPosition1, 2, GL_FLOAT, GL_FALSE, 0, BUFFER_OFFSET(0));
 	glEnableVertexAttribArray(vPosition1);
 
-
-	
+	glGenBuffers(1, BufferColour);
+	glBindBuffer(GL_ARRAY_BUFFER, BufferColour[0]);
+	glBufferData(GL_ARRAY_BUFFER, sizeof(verticesColour), verticesColour, GL_STATIC_DRAW);
+	glVertexAttribPointer(vertexColor, 3, GL_FLOAT, GL_FALSE, 0, BUFFER_OFFSET(0));
+	glEnableVertexAttribArray(vertexColor);
 }
 static void special(unsigned char key, int x_cord, int y_cord){
 	cout << key;
@@ -190,15 +201,15 @@ static void special(unsigned char key, int x_cord, int y_cord){
 			displaySecondTriangle = 1;
 		}
 		break;
-	case 'g' : // Generate Circle
+	case 'g': // Generate Circle
 		cout << endl << " Enter Radius :: ";
 		cin >> radius;
 		cout << endl << " Enter Number Of Triangle Steps :: " << endl;
 		cin >> numberOfTriangles;
-		
+
 		createCircleData();
 		break;
-	case 'z' : //  Toggle Circle
+	case 'z': //  Toggle Circle
 		if (circleEnabled)
 		{
 			circleEnabled = 0;
@@ -208,13 +219,13 @@ static void special(unsigned char key, int x_cord, int y_cord){
 			circleEnabled = 1;
 		}
 		break;
-	case 'q' : // Q ,  Quit
-			exit(0);
-			break;
+	case 'q': // Q ,  Quit
+		exit(0);
+		break;
 	case 27: // Escape Key
-			exit(0);
-			break;
-		
+		exit(0);
+		break;
+
 	default: return;
 	}
 	glutPostRedisplay();
@@ -239,8 +250,11 @@ void display(void)
 	{
 		glBindVertexArray(VAOs[1]);
 		glBindBuffer(GL_ARRAY_BUFFER, Buffers[1]);
-		glUseProgram(program1);
 		glEnableVertexAttribArray(vPosition1);
+		glBindBuffer(GL_ARRAY_BUFFER, BufferColour[0]);
+		glEnableVertexAttribArray(vertexColor);
+		glUseProgram(program1);
+		
 		glDrawArrays(GL_TRIANGLES, 0, 3);
 	}
 	// Circle
