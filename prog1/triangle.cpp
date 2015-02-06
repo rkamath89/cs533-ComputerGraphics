@@ -60,14 +60,13 @@ void createCircleData()
 	circleEnabled = 1;
 	glBindVertexArray(VAOs[2]);
 	verticesRequired = 3 + (numberOfTriangles - 1); // 1 Vertex is common [0,0] , the 1st triangle needs 2 Vertices apart from [0,0] and the other triangles need 1 vertice .
-	GLfloat incrementValue = ceil(360 / numberOfTriangles);
-	cout << endl << " User Entered Radius " << radius << " Triangles " << numberOfTriangles << "Vertices Required " << verticesRequired
-		<< " Increment Value " << incrementValue << endl;
+	GLfloat incrementValue = (GLfloat)360 / (GLfloat)numberOfTriangles;
+	/*cout << endl << " User Entered Radius " << radius << " Triangles " << numberOfTriangles << "Vertices Required " << verticesRequired
+		<< " Increment Value " << incrementValue << endl;*/
 	allocateMatrix();
 	int rowCount = 1;
-	for (int i = 0; i <= 360; i = i + incrementValue)
+	for (GLfloat i = 0; i <= 360; i = i + incrementValue)
 	{
-		cout << endl << " I " << i;
 		GLfloat x = radius*sin((i*PI) / 180);
 		GLfloat y = radius*cos((i*PI) / 180);
 		verticesCircle[rowCount][0] = x;
