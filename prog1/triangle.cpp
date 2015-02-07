@@ -5,7 +5,6 @@ CS 433/533
 */
 
 #define _CRT_SECURE_NO_WARNINGS
-#include <iomanip>
 #include <iostream>
 #include <string>
 #include "vgl.h"
@@ -29,16 +28,16 @@ GLuint Buffers[NumBuffers];
 GLuint BufferColour[1];
 // Variables for Circle
 GLfloat **verticesCircle;
-GLuint numberOfTriangles;
-GLfloat radius;
+float numberOfTriangles;
+float radius;
 GLuint verticesRequired;
 const float PI = 3.14159;
 //
 const GLuint NumVertices = 6;
 int wireMode = 1;
 int circleEnabled = 0;
-GLfloat red = 0.0f, blue = 1.0f, green = 0.0f;
-
+GLfloat red = 0.0f, blue = 0.0f, green = 0.0f;
+int colorEnabled;
 // Dynamic allocation Of Matrix based On user Inputs
 void allocateMatrix()
 {
@@ -59,20 +58,20 @@ void allocateMatrix()
 // KeyBoard Callback Fwd Declaration
 static void special(unsigned char key, int x_cord, int y_cord);
 
-void createCircleData()
+void createCircleData(float radius)
 {
 	circleEnabled = 1;
 	glBindVertexArray(VAOs[2]);
 	verticesRequired = 3 + (numberOfTriangles - 1); // 1 Vertex is common [0,0] , the 1st triangle needs 2 Vertices apart from [0,0] and the other triangles need 1 vertice .
-	GLdouble incrementValue = (GLdouble)360 / (GLdouble)numberOfTriangles;
+	float incrementValue = 360.0f / numberOfTriangles;
 	/*cout << endl << " User Entered Radius " << radius << " Triangles " << numberOfTriangles << "Vertices Required " << verticesRequired
 	<< " Increment Value " << incrementValue << endl;*/
 	allocateMatrix();
 	int rowCount = 1;
-	for (GLdouble i = 0; i <= 360; i = i + incrementValue)
+	for (float i = 0.0f; i <= 361.0f; i = i + incrementValue)
 	{
-		GLfloat x = radius*sin((i*PI) / 180);
-		GLfloat y = radius*cos((i*PI) / 180);
+		GLfloat x = radius*sin((i*PI) / 180.0f);
+		GLfloat y = radius*cos((i*PI) / 180.0f);
 		verticesCircle[rowCount][0] = x;
 		verticesCircle[rowCount][1] = y;
 		rowCount++;
@@ -122,7 +121,7 @@ void init(void)
 		{ -0.85f, 0.90f } };
 
 	glGenBuffers(NumBuffers, Buffers);
-	
+
 	/*for (int i = 0; i < NumBuffers; i++)
 	{
 	cout << endl << "Buffer Name " << i << " :" << Buffers[i];
@@ -159,7 +158,7 @@ void init(void)
 	};
 	glBindBuffer(GL_ARRAY_BUFFER, Buffers[1]);
 	glBufferData(GL_ARRAY_BUFFER, sizeof(vertices2), vertices2, GL_STATIC_DRAW);
-	
+
 	ShaderInfo  shaders1[] = {
 		{ GL_VERTEX_SHADER, "triangles1.vert" },
 		{ GL_FRAGMENT_SHADER, "triangles1.frag" },
@@ -178,11 +177,11 @@ void init(void)
 	glVertexAttribPointer(vertexColor, 3, GL_FLOAT, GL_FALSE, 0, BUFFER_OFFSET(0));
 	glEnableVertexAttribArray(vertexColor);
 }
-static void special(unsigned char key, int x_cord, int y_cord){
-	cout << key;
+static void special(unsigned char key, int x_cord, int y_cord)
+{
+
 	string clr;
-	
-	switch (key) 
+	switch (key)
 	{
 	case 'x': // Display FirstTriangle
 		if (displayFirstTriangle)
@@ -212,11 +211,13 @@ static void special(unsigned char key, int x_cord, int y_cord){
 		}
 		break;
 	case 'g': // Generate Circle
-		cout << endl << " Enter Radius :: ";
+		cout << " Circle Generation ";
+		cout << " \nEnter Radius :: ";
 		cin >> radius;
-		cout << endl << " Enter Number Of Triangle Steps :: " << endl;
+		cout << " \nEnter Number Of Triangle Steps :: ";
 		cin >> numberOfTriangles;
-		createCircleData();
+		//cin.ignore(NULL, '\n');
+		createCircleData(radius);
 		break;
 	case 'z': //  Toggle Circle
 		if (circleEnabled)
@@ -228,7 +229,7 @@ static void special(unsigned char key, int x_cord, int y_cord){
 			circleEnabled = 1;
 		}
 		break;
-	
+
 	case 'q': // Q ,  Quit
 		exit(0);
 		break;
@@ -237,23 +238,33 @@ static void special(unsigned char key, int x_cord, int y_cord){
 		break;
 	case 'c':
 		char colors[30];
-		cout << "Enter the colors[RED GREEN BLUE ] , delimited by space " << endl;
-		cin >> clr;
-		for (int i = 0; i < clr.length(); i++)
+		colorEnabled = 1;
+		//cin.ignore(10, '\n');
+		cout << "\nEnter the colors ";
+		cout << "\nEnter Red ";
+		cin >> red;
+		cout << "\nEnter Green ";
+		cin >> green;
+		cout << "\nEnter Blue";
+		cin >> blue;
+		//getline(cin,clr);
+		//cin >> clr;
+
+		/*for (int i = 0; i < clr.length(); i++)
 		{
-			colors[i] = clr[i];
+		colors[i] = clr[i];
 		}
 		char *val;
 		val = strtok(colors, " ");
 		if (val != NULL)
-			red = atof(val);
+		red = atof(val);
 		val = strtok(NULL, " ");
 		if (val != NULL)
-			blue = atof(val);
+		blue = atof(val);
 		val = strtok(NULL, " ");
 		if (val != NULL)
-			green = atof(val);
-		//cout << endl << " Values :: " << red << " " << blue << " " << green;
+		green = atof(val);
+		cout << "\n Values :: " << red << " " << blue << " " << green;*/
 		break;
 	default: return;
 	}
@@ -270,8 +281,11 @@ void display(void)
 	{
 		glBindVertexArray(VAOs[Triangles]);
 		glBindBuffer(GL_ARRAY_BUFFER, Buffers[ArrayBuffer]);
-		GLint loc1 = glGetUniformLocation(program, "customColour");
-		glProgramUniform4f(program, loc1, red , green , blue, 0.0f);
+		if (colorEnabled)
+		{
+			GLint loc1 = glGetUniformLocation(program, "customColour");
+			glProgramUniform4f(program, loc1, red, green, blue, 0.0f);
+		}
 		glUseProgram(program);
 		glEnableVertexAttribArray(vPosition);
 		glDrawArrays(GL_TRIANGLES, 0, 6);
@@ -285,7 +299,7 @@ void display(void)
 		glBindBuffer(GL_ARRAY_BUFFER, BufferColour[0]);
 		glEnableVertexAttribArray(vertexColor);
 		glUseProgram(program1);
-		
+
 		glDrawArrays(GL_TRIANGLES, 0, 3);
 	}
 	// Circle
@@ -293,8 +307,11 @@ void display(void)
 	{
 		glBindVertexArray(VAOs[2]);
 		glBindBuffer(GL_ARRAY_BUFFER, Buffers[2]);
-		GLint loc1 = glGetUniformLocation(program2, "customColour");
-		glProgramUniform4f(program2, loc1, red, green, blue, 0.0f);
+		if (colorEnabled)
+		{
+			GLint loc1 = glGetUniformLocation(program2, "customColour");
+			glProgramUniform4f(program2, loc1, red, green, blue, 0.0f);
+		}
 		glUseProgram(program2);
 		glEnableVertexAttribArray(vPosition2);
 		glDrawArrays(GL_TRIANGLE_FAN, 0, verticesRequired);
@@ -331,11 +348,11 @@ int main(int argc, char* argv[])
 	glGetIntegerv(GL_MAJOR_VERSION, &major);
 	glGetIntegerv(GL_MINOR_VERSION, &minor);
 
-	cout << "GL Vendor            :" << vendor << endl;
+	/*cout << "GL Vendor            :" << vendor << endl;
 	cout << "GL Renderer          :" << renderer << endl;
 	cout << "GL Version (string)  :" << version << endl;
 	cout << "GL Version (integer) :" << major << " " << minor << endl;
-	cout << "GLSL Version         :" << glslVersion << endl;
+	cout << "GLSL Version         :" << glslVersion << endl;*/
 	//
 	//GLint nExtensions;
 	//glGetIntegerv( GL_NUM_EXTENSIONS, &nExtensions );
