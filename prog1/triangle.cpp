@@ -4,12 +4,14 @@ Assignment 1
 CS 433/533
 */
 
+#define _CRT_SECURE_NO_WARNINGS
 #include <iomanip>
 #include <iostream>
-using namespace std;
-
+#include <string>
 #include "vgl.h"
 #include "LoadShaders.h"
+
+using namespace std;
 
 int displaySecondTriangle = 1, displayFirstTriangle = 1;
 //enum VAO_IDs { Triangles, NumVAOs };
@@ -35,6 +37,7 @@ const float PI = 3.14159;
 const GLuint NumVertices = 6;
 int wireMode = 1;
 int circleEnabled = 0;
+GLfloat red = 0.0f, blue = 1.0f, green = 0.0f;
 
 // Dynamic allocation Of Matrix based On user Inputs
 void allocateMatrix()
@@ -91,6 +94,8 @@ void createCircleData()
 	};
 
 	program2 = LoadShaders(shaders2);
+	/*GLint loc1 = glGetUniformLocation(program2, "customColour");
+	glProgramUniform4f(program2, loc1, red, green, blue, 0.0f);*/
 	glUseProgram(program2);
 
 	glVertexAttribPointer(vPosition2, 2, GL_FLOAT, GL_FALSE, 0, BUFFER_OFFSET(0));
@@ -132,6 +137,8 @@ void init(void)
 	};
 
 	program = LoadShaders(shaders);
+	/*GLint loc1 = glGetUniformLocation(program, "customColour");
+	glProgramUniform4f(program, loc1, 1.0f, 0.0f, 0.0f, 0.0f);*/
 	glUseProgram(program);
 
 	glVertexAttribPointer(vPosition, 2, GL_FLOAT, GL_FALSE, 0, BUFFER_OFFSET(0));
@@ -173,8 +180,10 @@ void init(void)
 }
 static void special(unsigned char key, int x_cord, int y_cord){
 	cout << key;
-	switch (key) {
-
+	string clr;
+	
+	switch (key) 
+	{
 	case 'x': // Display FirstTriangle
 		if (displayFirstTriangle)
 		{
@@ -184,6 +193,7 @@ static void special(unsigned char key, int x_cord, int y_cord){
 		{
 			displayFirstTriangle = 1;
 		}
+		break;
 	case 's': // Shaded Mode
 		glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
 		break;
@@ -206,7 +216,6 @@ static void special(unsigned char key, int x_cord, int y_cord){
 		cin >> radius;
 		cout << endl << " Enter Number Of Triangle Steps :: " << endl;
 		cin >> numberOfTriangles;
-
 		createCircleData();
 		break;
 	case 'z': //  Toggle Circle
@@ -219,13 +228,33 @@ static void special(unsigned char key, int x_cord, int y_cord){
 			circleEnabled = 1;
 		}
 		break;
+	
 	case 'q': // Q ,  Quit
 		exit(0);
 		break;
 	case 27: // Escape Key
 		exit(0);
 		break;
-
+	case 'c':
+		char colors[30];
+		cout << "Enter the colors[RED GREEN BLUE ] , delimited by space " << endl;
+		cin >> clr;
+		for (int i = 0; i < clr.length(); i++)
+		{
+			colors[i] = clr[i];
+		}
+		char *val;
+		val = strtok(colors, " ");
+		if (val != NULL)
+			red = atof(val);
+		val = strtok(NULL, " ");
+		if (val != NULL)
+			blue = atof(val);
+		val = strtok(NULL, " ");
+		if (val != NULL)
+			green = atof(val);
+		//cout << endl << " Values :: " << red << " " << blue << " " << green;
+		break;
 	default: return;
 	}
 	glutPostRedisplay();
@@ -241,6 +270,8 @@ void display(void)
 	{
 		glBindVertexArray(VAOs[Triangles]);
 		glBindBuffer(GL_ARRAY_BUFFER, Buffers[ArrayBuffer]);
+		GLint loc1 = glGetUniformLocation(program, "customColour");
+		glProgramUniform4f(program, loc1, red , green , blue, 0.0f);
 		glUseProgram(program);
 		glEnableVertexAttribArray(vPosition);
 		glDrawArrays(GL_TRIANGLES, 0, 6);
@@ -262,6 +293,8 @@ void display(void)
 	{
 		glBindVertexArray(VAOs[2]);
 		glBindBuffer(GL_ARRAY_BUFFER, Buffers[2]);
+		GLint loc1 = glGetUniformLocation(program2, "customColour");
+		glProgramUniform4f(program2, loc1, red, green, blue, 0.0f);
 		glUseProgram(program2);
 		glEnableVertexAttribArray(vPosition2);
 		glDrawArrays(GL_TRIANGLE_FAN, 0, verticesRequired);
