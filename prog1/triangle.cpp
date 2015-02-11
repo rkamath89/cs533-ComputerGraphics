@@ -8,6 +8,7 @@ CS 433/533
 #include <iostream>
 #include <string>
 #include "vgl.h"
+#include <math.h>
 #include "LoadShaders.h"
 
 using namespace std;
