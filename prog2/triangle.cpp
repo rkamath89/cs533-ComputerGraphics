@@ -22,6 +22,8 @@
 using namespace std;
 using namespace glm;
 
+
+const int _MAX_ROWS_ = 3000;
 struct materialValues
 {
 	char color[20];
@@ -43,9 +45,10 @@ const GLuint ArrayBuffer = 0, NumBuffers = 1;
 const GLuint vPosition = 0, vertexColor = 3;
 
 GLuint NumVertices = 0;
-GLfloat vertices[300][3];
-GLfloat verticesNormal[300][3];
-GLfloat finalVertices[300][3], finalVerticesNormals[300][3];
+GLfloat vertices[_MAX_ROWS_][3];
+GLfloat verticesNormal[_MAX_ROWS_][3];
+GLfloat finalVertices[_MAX_ROWS_][3], finalVerticesNormals[_MAX_ROWS_][3];
+GLuint faces[_MAX_ROWS_];	GLuint facesBuffer[1];
 
 
 GLuint VAOs[NumVAOs];
@@ -53,29 +56,14 @@ GLuint Buffers[NumBuffers];
 GLuint ColorBuffer[1];
 
 
-GLuint faces[300];	GLuint facesBuffer[1];
+
 
 GLint uniform_mvp;
 glm::mat4 model, view, projection, mvp,trans;
 char * delimiter = " ,'\n'";
 float maxXRange = 0.0f, minXRange = 999.0f, maxYRange = 0.0f, minYRange = 999.0f, maxZRange = 0.0f, minZRange = 999.0f;
 GLfloat cameraX = 6.0f, cameraY = 6.0f, cameraZ = 0.0f;
-enum colors
-{
-	red=0,
-	blue=1,
-	green=2,
-	yellow=3,
-	cyan=4,
-	magenta = 5,
-	white=6,
-	gray=7,
-	purple=8,
-	orange=9,
-	turquoise = 10,
-	pink=11,
-	brown=12
-};
+
 
 /////////////////////////////////////////////////////
 //  int
@@ -379,9 +367,29 @@ void printMaxAndMin()
 	cout << endl << "MAX ::" << maxXRange << " " << maxYRange << " " << maxZRange << endl;
 	cout << endl << "MIN ::" << minXRange << " " << minYRange << " " << minZRange << endl;
 }
+string getValueTillSlash(int start, char* value)
+{
+	string result;
+	while (value != NULL && value[start] != '\0')
+	{
+		if (value[start] != '/')
+		{
+			result = result + value[start];
+			start++;
+		}
+		else
+		{
+			break;
+		}
+		
+	}
+	return result;
+
+}
 void readInputFile(char* fileName)
 {
 	FILE * fp;
+	int countOfSlashes = 0, lengthOfSlashes = 0;
 	char *token;
 	char *keyWord;
 	char *lineRead = (char*)malloc(100);
@@ -406,7 +414,7 @@ void readInputFile(char* fileName)
 							mtlLibName = strtok(NULL, delimiter);
 							cout << endl <<  "Mat lib name ::"  << mtlLibName;
 							readMaterialFile(mtlLibName);
-							printMaterialFile(); //For Debugging
+							//printMaterialFile(); //For Debugging
 						}
 						else if (strcmp(keyWord,"v") == 0 )
 						{
@@ -442,17 +450,20 @@ void readInputFile(char* fileName)
 						else if (strcmp(keyWord, "f") == 0)
 						{
 							bool slashFormat = false;
+							lengthOfSlashes = 0, countOfSlashes=0; // Reset the values per iteration
 							char * value = strtok(NULL, delimiter);
 							/* Check if format is v/vt/vn*/
 							
 							int i = 0;
-							while (slashFormat == false && value != NULL && value[i] != '\0')
+							while (value != NULL && value[i] != '\0')
 							{
 								if (value[i] == '/')
 								{
 									slashFormat = true;
-									break;
+									countOfSlashes++;
+									//break;
 								}
+								lengthOfSlashes++;
 								i++;
 							}
 							// End
@@ -461,9 +472,16 @@ void readInputFile(char* fileName)
 							{
 								while (value != NULL)
 								{
+									int j = 0;
+									lengthOfSlashes = 0;
+									while (value != NULL && value[j] != '\0')
+									{
+										lengthOfSlashes++;
+										j++;
+									}
 									i = 0;
 									int positionOfSlash = 0; // is it 1st 2nd or 3rd slash
-									while (i <3 && value != NULL && value[i] != NULL && value[i] != '\n' && value[i] != '\0')
+									while (i < lengthOfSlashes+ 1 && value != NULL && value[i] != NULL && value[i] != '\n' && value[i] != '\0')
 									{
 										if (value[i] == '/')
 										{
@@ -472,30 +490,39 @@ void readInputFile(char* fileName)
 										}
 										if (positionOfSlash == 0)// 1st slash is for vertex info
 										{
-											int val = value[i]-'0';
-											int vertexIndex = val - 1;
+											//int val = value[i] - '0';
+											string result= getValueTillSlash(i,value);
+											int vertexIndex = atoi(result.c_str()) - 1;
+											//cout << endl << result;
+											int length = result.length();
 											finalVertices[facesValue][0] = vertices[vertexIndex][0];
 											finalVertices[facesValue][1] = vertices[vertexIndex][1];
 											finalVertices[facesValue][2] = vertices[vertexIndex][2];
 											facesValue++;
-											i++;
+											i = i + length;
 										}
 										else if (positionOfSlash == 1)
 										{
 											// Do nothing we do not handle Vt
-											positionOfSlash++;
-											i++;
+											string result = getValueTillSlash(i, value);
+											//cout << "/" << result;
+											int length = result.length();
+											//positionOfSlash++;
+											i = i + length;
 										}
 										else if (positionOfSlash == 2)
 										{
 											// Handle face normal here
-											int val = value[i] - '0';
-											int vertexIndex = val - 1;
+											string result = getValueTillSlash(i, value);
+											int vertexIndex = atoi(result.c_str()) - 1;
+											int length = result.length();
+											//int val = value[i] - '0';
+											//int vertexIndex = val - 1;
 											finalVerticesNormals[normalValue][0] = verticesNormal[vertexIndex][0];
 											finalVerticesNormals[normalValue][1] = verticesNormal[vertexIndex][1];
 											finalVerticesNormals[normalValue][2] = verticesNormal[vertexIndex][2];
 											normalValue++;
-											i++;
+											i = i + length;
 										}
 
 									}
