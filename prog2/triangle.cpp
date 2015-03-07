@@ -23,7 +23,7 @@ using namespace std;
 using namespace glm;
 
 
-const int _MAX_ROWS_ = 3000;
+const int _MAX_ROWS_ = 1000;
 struct materialValues
 {
 	char color[20];
@@ -35,7 +35,7 @@ struct materialValues materialFileValues[100];
 int materialFileValuesIndex = 0;
 
 
-GLuint  vertexIndex = 0, facesValue = 0, normalValue = 0, verticesNormalsIndex = 0;
+GLuint  vertexIndex = 0, facesValue = 0, finalNormalValue = 0, verticesNormalsIndex = 0;
 GLuint program;
 //enum VAO_IDs { Triangles, NumVAOs };
 const GLuint Triangles = 0, NumVAOs = 1;
@@ -47,11 +47,11 @@ const GLuint vPosition = 0, vertexColor = 3;
 GLuint NumVertices = 0;
 GLfloat vertices[_MAX_ROWS_][3];
 GLfloat verticesNormal[_MAX_ROWS_][3];
-GLfloat finalVertices[_MAX_ROWS_][3], finalVerticesNormals[_MAX_ROWS_][3];
+GLfloat finalVertices[_MAX_ROWS_][3], finalVerticesNormals[_MAX_ROWS_][3] ;
 GLuint faces[_MAX_ROWS_];	GLuint facesBuffer[1];
 
 
-GLuint VAOs[NumVAOs];
+GLuint VAOs[NumVAOs] ;
 GLuint Buffers[NumBuffers];
 GLuint ColorBuffer[1];
 
@@ -60,11 +60,14 @@ GLuint ColorBuffer[1];
 
 GLint uniform_mvp;
 glm::mat4 model, view, projection, mvp,trans;
+float degree = 0;
 char * delimiter = " ,'\n'";
 float maxXRange = 0.0f, minXRange = 999.0f, maxYRange = 0.0f, minYRange = 999.0f, maxZRange = 0.0f, minZRange = 999.0f;
 GLfloat cameraX = 6.0f, cameraY = 6.0f, cameraZ = 0.0f;
 
-
+// Colors also should have been parsed by Now
+GLfloat lightSource[3] = { 1.2f, -2.0f, -2.0f };
+GLfloat verticesColor[_MAX_ROWS_][3];
 /////////////////////////////////////////////////////
 //  int
 /////////////////////////////////////////////////////
@@ -84,45 +87,7 @@ void init(void)
 	glBufferData(GL_ARRAY_BUFFER, sizeof(finalVertices), finalVertices, GL_DYNAMIC_DRAW);
 	// End of vertices
 	
-	// Colors also should have been parsed by Now
-	GLfloat verticesColor[48][3] = {
-		{ 1.0f, 0.0f, 0.0f },	// Triangle 1
-		{ 1.0f, 0.0f, 0.0f },
-		{ 1.0f, 0.0f, 0.0f },
-		{ 1.0f, 0.0f, 0.0f },
-		{ 0.0f, 1.0f, 0.0f },
-		{ 0.0f, 1.0f, 0.0f },
-		{ 0.0f, 1.0f, 0.0f },
-		{ 0.0f, 1.0f, 0.0f },
-		{ 1.0f, 1.0f, 0.0f },	// Triangle 1
-		{ 1.0f, 1.0f, 0.0f },
-		{ 1.0f, 1.0f, 0.0f },
-		{ 1.0f, 1.0f, 0.0f },
-		{ 0.0f, 1.0f, 1.0f },
-		{ 0.0f, 1.0f, 1.0f },
-		{ 0.0f, 1.0f, 1.0f },
-		{ 0.0f, 1.0f, 1.0f },
-		{ 0.5f, 0.5f, 0.5f },	// Triangle 1
-		{ 0.5f, 0.5f, 0.5f },
-		{ 0.5f, 0.5f, 0.5f },
-		{ 0.5f, 0.5f, 0.5f },
-		{ 0.5f, 1.5f, 0.5f },
-		{ 0.5f, 1.5f, 0.5f },
-		{ 0.5f, 1.5f, 0.5f },
-		{ 0.5f, 1.5f, 0.5f },
-		{ 1.0f, 0.0f, 0.0f },	// Triangle 1
-		{ 1.0f, 0.0f, 0.0f },
-		{ 1.0f, 0.0f, 0.0f },
-		{ 1.0f, 0.0f, 0.0f },
-		{ 0.0f, 1.0f, 0.0f },
-		{ 0.0f, 1.0f, 0.0f },
-		{ 0.0f, 1.0f, 0.0f },
-		{ 0.0f, 1.0f, 0.0f },
-		{ 1.0f, 0.0f, 0.0f },	// Triangle 1
-		{ 1.0f, 0.0f, 0.0f },
-		{ 1.0f, 0.0f, 0.0f },
-		{ 1.0f, 0.0f, 0.0f }
-	};
+	
 
 	glGenBuffers(1, ColorBuffer);
 	glBindBuffer(GL_ARRAY_BUFFER, ColorBuffer[0]);
@@ -151,6 +116,7 @@ void display(void)
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 	
 	// Transformation
+
 	model = glm::translate(glm::mat4(1.0f), glm::vec3(0.0, 0.0,-4.0));// T from obj file else just identity mat
 	//trans = glm::scale(trans, glm::vec3(1.5, 1.5, 1.5));
 	//trans = glm::translate(trans, glm::vec3(1.0f, 1.0f, 0.0f));
@@ -165,7 +131,7 @@ void display(void)
 	//view = glm::lookAt(glm::vec3(maxXRange, maxYRange, maxZRange), glm::vec3(focalX, focalY, focalZ), glm::vec3(0.0, 1.0, 0.0));
 	view = glm::lookAt(glm::vec3(cameraX, cameraY, cameraZ), glm::vec3(0.0, 0.0, -4.0), glm::vec3(0.0, 0.0, 1.0));
 	projection = glm::perspective(45.0f, 1.0f*screen_width / screen_height, 0.1f, 100.0f);
-	mvp = projection * view * model * trans;
+	mvp = projection * view * model * trans ;
 	// End Transformation
 	glUseProgram(program);
 	glUniformMatrix4fv(uniform_mvp, 1, GL_FALSE, glm::value_ptr(mvp));
@@ -208,6 +174,22 @@ void display(void)
 	glFlush();
 }
 
+void fillUpColorArray()
+{
+
+}
+materialValues getDetailsOfMaterial(char *color)
+{
+	struct materialValues  tempMaterialValues;
+	for (int i = 0; i < materialFileValuesIndex; i++)
+	{
+		tempMaterialValues = materialFileValues[i];
+		if (strcmp(tempMaterialValues.color, color) == 0)
+		{
+			return tempMaterialValues;
+		}
+	}
+}
 void readMaterialFile(char* fileName)
 {
 	FILE * fp;
@@ -295,14 +277,26 @@ void printVertexValues()
 		}
 	}
 }
+void printColors()
+{
+	for (int i = 0; i < finalNormalValue; i++)
+	{
+		cout << endl << " Vertex Color:: " << i << endl;
+		for (int j = 0; j < 3; j++)
+		{
+			cout << verticesColor[i][j] << "  ";
+
+		}
+	}
+}
 void printVertexNormalValues()
 {
-	for (int i = 0; i < verticesNormalsIndex; i++)
+	for (int i = 0; i < finalNormalValue; i++)
 	{
 		cout << endl << " Vertex Normals:: " << i << endl;
 		for (int j = 0; j < 3; j++)
 		{
-			cout << vertices[i][j] << "  ";
+			cout << finalVerticesNormals[i][j] << "  ";
 
 		}
 	}
@@ -400,8 +394,11 @@ void readInputFile(char* fileName)
 	{
 		//vertex = 0;
 		facesValue = 0;
+		int  normalForFace = 0, getNormalForFacePos = 0;
+		struct materialValues foundMaterialValue;
+		char * colorName;
 		while (!feof(fp))
-		{
+		{	
 			fgets(lineRead, 50, fp);
 			{
 				keyWord = strtok(lineRead, " ");
@@ -415,6 +412,12 @@ void readInputFile(char* fileName)
 							cout << endl <<  "Mat lib name ::"  << mtlLibName;
 							readMaterialFile(mtlLibName);
 							//printMaterialFile(); //For Debugging
+						}
+						else if (strcmp(keyWord, "usemtl") == 0)
+						{
+							colorName = strtok(NULL, delimiter);
+							foundMaterialValue = getDetailsOfMaterial(colorName);
+							cout << endl << "ColorName ::" << foundMaterialValue.color;
 						}
 						else if (strcmp(keyWord,"v") == 0 )
 						{
@@ -518,10 +521,23 @@ void readInputFile(char* fileName)
 											int length = result.length();
 											//int val = value[i] - '0';
 											//int vertexIndex = val - 1;
-											finalVerticesNormals[normalValue][0] = verticesNormal[vertexIndex][0];
-											finalVerticesNormals[normalValue][1] = verticesNormal[vertexIndex][1];
-											finalVerticesNormals[normalValue][2] = verticesNormal[vertexIndex][2];
-											normalValue++;
+											finalVerticesNormals[finalNormalValue][0] = verticesNormal[vertexIndex][0];
+											finalVerticesNormals[finalNormalValue][1] = verticesNormal[vertexIndex][1];
+											finalVerticesNormals[finalNormalValue][2] = verticesNormal[vertexIndex][2];
+
+											for (int colPos = 0; colPos < 3; colPos++)
+											{
+												float maxValue = 0.0f;
+												float multipliedValue = finalVerticesNormals[finalNormalValue][colPos] * lightSource[colPos];
+												if (multipliedValue > maxValue)
+												{
+													maxValue = multipliedValue;
+												}
+												float result = foundMaterialValue.ka[colPos] + (maxValue * foundMaterialValue.kd[colPos]);
+												verticesColor[finalNormalValue][colPos] = result;
+											}
+
+											finalNormalValue++;
 											i = i + length;
 										}
 
@@ -538,6 +554,28 @@ void readInputFile(char* fileName)
 									finalVertices[facesValue][0] = vertices[vertexIndex][0];
 									finalVertices[facesValue][1] = vertices[vertexIndex][1];
 									finalVertices[facesValue][2] = vertices[vertexIndex][2];
+									if (normalForFace > 5)
+									{
+										normalForFace =0;
+										getNormalForFacePos++;
+									}
+									finalVerticesNormals[finalNormalValue][0] = verticesNormal[getNormalForFacePos][0];
+									finalVerticesNormals[finalNormalValue][1] = verticesNormal[getNormalForFacePos][1];
+									finalVerticesNormals[finalNormalValue][2] = verticesNormal[getNormalForFacePos][2];
+
+									for (int colPos = 0; colPos < 3; colPos++)
+									{
+										float maxValue = 0.0f;
+										float multipliedValue = finalVerticesNormals[finalNormalValue][colPos] * lightSource[colPos];
+										if (multipliedValue > maxValue)
+										{
+											maxValue = multipliedValue;
+										}
+										float result = foundMaterialValue.ka[colPos] + (maxValue * foundMaterialValue.kd[colPos]);
+										verticesColor[finalNormalValue][colPos] = result;
+									}
+									
+									normalForFace++; finalNormalValue++;
 									facesValue++;
 									value = strtok(NULL, delimiter);
 								}
@@ -582,6 +620,13 @@ static void special(unsigned char key, int x_cord, int y_cord)
 	case 'i':
 		cameraZ = cameraZ - 0.05f;
 		break;
+	case 'x':
+		trans = glm::scale(trans, glm::vec3(1.5, 1.5, 1.5));
+		break;
+	case 'd':
+		//trans = glm::scale(trans, glm::vec3(1.5, 1.5, 1.5));
+		trans = glm::rotate(mat4(), degree++, vec3(0.0f, 0.0f, 1.0f));
+		break;
 	default: return;
 	}
 	glutPostRedisplay();
@@ -593,8 +638,11 @@ int main(int argc, char* argv[])
 {
 
 	//Code to read data from File
-	char* fileName = "cube_multicolor2.obj";
+	char* fileName = "cube_single.obj";
 	readInputFile(fileName);
+	fillUpColorArray();
+	printColors();
+	//printVertexNormalValues();
 	//printVertexValues();
 	//printFacesValues();
 	//printFinalVertexValues();
