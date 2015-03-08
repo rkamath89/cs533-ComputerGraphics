@@ -27,6 +27,8 @@ using namespace glm;
 
 const int _MAX_ROWS_ = 1000;
 const int numberOfObjects = 10;
+
+
 struct materialValues
 {
 	char color[20];
@@ -40,57 +42,59 @@ int materialFileValuesIndex = 0;
 
 GLuint  vertexIndex = 0, facesValue = 0, finalNormalValue = 0, verticesNormalsIndex = 0;
 GLuint program;
-//enum VAO_IDs { Triangles, NumVAOs };
-const GLuint Triangles_OBJECT = 0, NumVAOs = 10;
-//enum Buffer_IDs { ArrayBuffer, NumBuffers };
-const GLuint ArrayBuffer = 0;
+
 //enum Attrib_IDs { vPosition = 0 };
 const GLuint vPosition = 0, vertexColor = 1;
 
 GLuint NumVertices = 0;
 GLfloat vertices[_MAX_ROWS_][3];
 GLfloat verticesNormal[_MAX_ROWS_][3];
-GLfloat finalVertices[_MAX_ROWS_][3], finalVerticesNormals[_MAX_ROWS_][3] ;
-GLuint faces[_MAX_ROWS_];	GLuint facesBuffer[1];
+GLfloat finalVertices[_MAX_ROWS_][3], finalVerticesNormals[_MAX_ROWS_][3];
+GLuint faces[_MAX_ROWS_];	
+GLfloat verticesColor[_MAX_ROWS_][3];
 
-
-GLuint VAOs[NumVAOs] ;
-const int NumBuffers = 10;
-GLuint Buffers[NumBuffers];
-const int NumColorBuffers = 10;
-GLuint ColorBuffer[NumColorBuffers];
+GLuint VAOs[numberOfObjects];
+GLuint Buffers[numberOfObjects];
+GLuint ColorBuffer[numberOfObjects];
 
 float screen_width = 512.0f, screen_height = 512.0f;
 
 struct translationObject
 {
 	int objNumber;
+	int numberOfFaces;// Number of vertices actually
+	char fileName[20];
+	float rotationDegree = 0;
 	glm::vec3 rotationValueForObject;
+	int scalingEnabled = 0;
 	glm::vec3 scalingValueForObject;
+	int translationEnabled = 0;
 	glm::vec3 transationValueForObject;
+	glm::mat4 transformation = mat4(1.0f);
 };
-int objectNumber = 0;
+int objectNumber = -1;
 struct translationObject objectInformation[numberOfObjects];
 
 
 GLint uniform_mvp;
-glm::mat4 model, view, projection, mvp, trans, revolve;
-char * delimiter = " ,'\n'";
+glm::mat4 model, view, projection, mvp;
+
 float maxXRange = 0.0f, minXRange = 999.0f, maxYRange = 0.0f, minYRange = 999.0f, maxZRange = 0.0f, minZRange = 999.0f;
 
-GLfloat cameraX = 6.0f, cameraY = 6.0f, cameraZ = 6.0f;
+// Default camera values
+GLfloat cameraX = 0.0f, cameraY = 0.0f, cameraZ = 0.0f;
 GLfloat focalX = 0.0f, focalY = 0.0f, focalZ = 0.0f;
 GLfloat lookupX = 0.0f, lookupY = 0.0f, lookupZ = 1.0f;
 glm::vec3 viewUpVector = { lookupX, lookupY, lookupZ };
-
 GLfloat nearDist = 0.1f, farDist = 100.0f;
 float degree = 0, degree1 = 0;
+// Default camera values End
 
 
-
-// Colors also should have been parsed by Now
 GLfloat lightSource[3] = { 1.2f, -2.0f, -2.0f };
-GLfloat verticesColor[_MAX_ROWS_][3];
+
+
+char * delimiter = " ,'\n'";
 /////////////////////////////////////////////////////
 //  int
 /////////////////////////////////////////////////////
@@ -98,27 +102,32 @@ void init(void)
 {
 	degree1 = cameraY / cameraX;
 	glMatrixMode(GL_PROJECTION);
-	ShaderInfo  shaders[] = {{ GL_VERTEX_SHADER, "triangles.vert" },{ GL_FRAGMENT_SHADER, "triangles.frag" },{ GL_NONE, NULL }};
+	ShaderInfo  shaders[] = { { GL_VERTEX_SHADER, "triangles.vert" }, { GL_FRAGMENT_SHADER, "triangles.frag" }, { GL_NONE, NULL } };
 	program = LoadShaders(shaders);
 	glUseProgram(program);
 	uniform_mvp = glGetUniformLocation(program, "mvp");
+	
+	glGenVertexArrays(9, VAOs);
+	glGenBuffers(9, Buffers); // Create 1 Buffer and put id in VAO's
+	glGenBuffers(9, ColorBuffer);
+
 
 }
-void storeValuesInBuffer(int objectNumber)
+void storeValuesInBuffer(int number)
 {
 	glMatrixMode(GL_PROJECTION);
 	// By now we have parsed the .obj for all vertices
-	glGenVertexArrays(NumVAOs, VAOs);
-	glBindVertexArray(VAOs[objectNumber]);
-	glGenBuffers(NumBuffers, Buffers); // Create 1 Buffer and put id in VAO's
-	glBindBuffer(GL_ARRAY_BUFFER, Buffers[objectNumber]);
+	//glGenVertexArrays(9, VAOs);
+	glBindVertexArray(VAOs[number]);
+	//glGenBuffers(NumBuffers, Buffers); // Create 1 Buffer and put id in VAO's
+	glBindBuffer(GL_ARRAY_BUFFER, Buffers[number]);
 	glBufferData(GL_ARRAY_BUFFER, sizeof(finalVertices), finalVertices, GL_DYNAMIC_DRAW);
 	// End of vertices
-	glGenBuffers(1, ColorBuffer);
-	glBindBuffer(GL_ARRAY_BUFFER, ColorBuffer[objectNumber]);
-	glBufferData(GL_ARRAY_BUFFER, sizeof(verticesColor), verticesColor, GL_STATIC_DRAW);
+	//glGenBuffers(9, ColorBuffer);
+	glBindBuffer(GL_ARRAY_BUFFER, ColorBuffer[number]);
+	glBufferData(GL_ARRAY_BUFFER, sizeof(verticesColor), verticesColor, GL_DYNAMIC_DRAW);
 	// End Of Color
-	
+
 
 }
 ////////////////////////////////////////////////////////////////////
@@ -126,70 +135,76 @@ void storeValuesInBuffer(int objectNumber)
 ////////////////////////////////////////////////////////////////////
 void display(void)
 {
-	
+	int displayObject = 0;
 	glClearColor(1.0, 1.0, 1.0, 1.0);
 	glClearDepth(GL_DEPTH_BUFFER_BIT);
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 	
 	// Transformation
+	for (int i = 0; i < objectNumber; i++)
+	{
 
-	//model = glm::translate(glm::mat4(1.0f), glm::vec3(0.0, 0.0,-4.0));// T from obj file else just identity mat
-	//trans = glm::scale(trans, glm::vec3(1.5, 1.5, 1.5));
-	//trans = glm::translate(trans, glm::vec3(1.0f, 1.0f, 0.0f));
-	//view = glm::lookAt(glm::vec3(0.0, 0.0, 0.0), glm::vec3(0.0, 0.0, 0.0), glm::vec3(0.0, 1.0, 0.0));
-	/*Focal Point is at the Geometric center MAX+MIN/2*/
-	
-	/*float focalX, focalY, focalZ;
-	focalX = (maxXRange + minXRange) / 2;
-	focalY = (maxYRange + minYRange) / 2;
-	focalZ = (maxZRange + minZRange) / 2;*/
-	//cout << "Focal :: " << focalX <<" " <<  focalY <<" " << focalZ;
-	//view = glm::lookAt(glm::vec3(maxXRange, maxYRange, maxZRange), glm::vec3(focalX, focalY, focalZ), glm::vec3(0.0, 1.0, 0.0));
-	model = glm::mat4(1.0f);
-	view = glm::lookAt(glm::vec3(cameraX, cameraY, cameraZ), glm::vec3(focalX, focalY, focalZ), viewUpVector);
-	//projection = glm::perspective(45.0f, 1.0f*screen_width / screen_height, 0.1f, 100.0f);
-	projection = glm::frustum(-0.1f, 0.1f, -0.1f, 0.1f, nearDist, farDist);
-	mvp = projection * view * model;
-	// End Transformation
-	glUseProgram(program);
-	glUniformMatrix4fv(uniform_mvp, 1, GL_FALSE, glm::value_ptr(mvp));
-	
+		//model = glm::translate(glm::mat4(1.0f), glm::vec3(0.0, 0.0,-4.0));// T from obj file else just identity mat
+		//trans = glm::scale(trans, glm::vec3(1.5, 1.5, 1.5));
+		//trans = glm::translate(trans, glm::vec3(1.0f, 1.0f, 0.0f));
+		//view = glm::lookAt(glm::vec3(0.0, 0.0, 0.0), glm::vec3(0.0, 0.0, 0.0), glm::vec3(0.0, 1.0, 0.0));
+		/*Focal Point is at the Geometric center MAX+MIN/2*/
+
+		/*float focalX, focalY, focalZ;
+		focalX = (maxXRange + minXRange) / 2;
+		focalY = (maxYRange + minYRange) / 2;
+		focalZ = (maxZRange + minZRange) / 2;*/
+		//cout << "Focal :: " << focalX <<" " <<  focalY <<" " << focalZ;
+		//view = glm::lookAt(glm::vec3(maxXRange, maxYRange, maxZRange), glm::vec3(focalX, focalY, focalZ), glm::vec3(0.0, 1.0, 0.0));
+		model = glm::mat4(1.0f);
+		view = glm::lookAt(glm::vec3(cameraX, cameraY, cameraZ), glm::vec3(focalX, focalY, focalZ), viewUpVector);
+		//projection = glm::perspective(45.0f, 1.0f*screen_width / screen_height, nearDist, farDist);
+		projection = glm::frustum(-0.1f, 0.1f, -0.1f, 0.1f, nearDist, farDist);
+		mvp = projection * view * model * objectInformation[i].transformation;
+		// End Transformation
+		glUseProgram(program);
+		glUniformMatrix4fv(uniform_mvp, 1, GL_FALSE, glm::value_ptr(mvp));
 
 
-	glEnableVertexAttribArray(vPosition);
-	glBindVertexArray(VAOs[Triangles_OBJECT]);
-	glBindBuffer(GL_ARRAY_BUFFER, Buffers[ArrayBuffer]);
-	glVertexAttribPointer(
-		vPosition, // attribute
-		3,                 // number of elements per vertex, here (x,y,z)
-		GL_FLOAT,          // the type of each element
-		GL_FALSE,          // take our values as-is
-		0,                 // no extra data between each position
-		0                  // offset of first element
-		);
 
-	glEnableVertexAttribArray(vertexColor);
-	glBindBuffer(GL_ARRAY_BUFFER, ColorBuffer[0]);
-	glVertexAttribPointer(
-		vertexColor, // attribute
-		3,                 // number of elements per vertex, here (R,G,B)
-		GL_FLOAT,          // the type of each element
-		GL_FALSE,          // take our values as-is
-		0,                 // no extra data between each position
-		0                  // offset of first element
-		);
+		glEnableVertexAttribArray(vPosition);
+		glBindVertexArray(VAOs[i]);
+		glBindBuffer(GL_ARRAY_BUFFER, Buffers[i]);
+		glVertexAttribPointer(
+			vPosition, // attribute
+			3,                 // number of elements per vertex, here (x,y,z)
+			GL_FLOAT,          // the type of each element
+			GL_FALSE,          // take our values as-is
+			0,                 // no extra data between each position
+			0                  // offset of first element
+			);
 
-	/* Push each element in buffer_vertices to the vertex shader */
-	/*glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, facesBuffer[0]);
-	int size;  glGetBufferParameteriv(GL_ELEMENT_ARRAY_BUFFER, GL_BUFFER_SIZE, &size);
-	cout << endl << " Faces Size :: " << facesValue << " size" << size << endl;
-	glDrawElements(GL_TRIANGLES, size / sizeof(GLuint), GL_UNSIGNED_INT, 0);*/
-	glDrawArrays(GL_TRIANGLES, 0, facesValue);
-	glDisableVertexAttribArray(vPosition);
-	glDisableVertexAttribArray(vertexColor);
+		glEnableVertexAttribArray(vertexColor);
+		glBindBuffer(GL_ARRAY_BUFFER, ColorBuffer[i]);
+		glVertexAttribPointer(
+			vertexColor, // attribute
+			3,                 // number of elements per vertex, here (R,G,B)
+			GL_FLOAT,          // the type of each element
+			GL_FALSE,          // take our values as-is
+			0,                 // no extra data between each position
+			0                  // offset of first element
+			);
+
+		/* Push each element in buffer_vertices to the vertex shader */
+		/*glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, facesBuffer[0]);
+		int size;  glGetBufferParameteriv(GL_ELEMENT_ARRAY_BUFFER, GL_BUFFER_SIZE, &size);
+		cout << endl << " Faces Size :: " << facesValue << " size" << size << endl;
+		glDrawElements(GL_TRIANGLES, size / sizeof(GLuint), GL_UNSIGNED_INT, 0);*/
+		glDrawArrays(GL_TRIANGLES, 0, objectInformation[i].numberOfFaces);
+		glDisableVertexAttribArray(vPosition);
+		glDisableVertexAttribArray(vertexColor);
+		
+		
+	}
 	glutSwapBuffers();
-
 	glFlush();
+	
+
 }
 
 materialValues getDetailsOfMaterial(char *color)
@@ -230,9 +245,9 @@ void readMaterialFile(char* fileName)
 				{
 					if (strcmp(keyWord, "newmtl") == 0)
 					{
-						char *colorName = strtok(NULL,"\n");
+						char *colorName = strtok(NULL, "\n");
 						strcpy(newMaterialValue.color, colorName);
-						
+
 					}
 					else if (strcmp(keyWord, "Ka") == 0)
 					{
@@ -267,6 +282,117 @@ void readMaterialFile(char* fileName)
 		}
 	}
 }
+void readControlFIle(char* fileName)
+{
+	FILE * fp;
+	char *token;
+	char *keyWord;
+	char * delimiter = " ,'\n','\r','\0'";
+	char *lineRead = (char*)malloc(100);
+
+	if ((fp = fopen(fileName, "r")) != NULL)
+	{
+		int actionNumber = 1;
+		while (!feof(fp))
+		{
+			fgets(lineRead, 50, fp);
+			{
+				keyWord = strtok(lineRead, delimiter);
+				while (keyWord != NULL)
+				{
+					if (strcmp(keyWord, "obj") == 0)
+					{
+						actionNumber = 1;
+						objectNumber++;
+						objectInformation[objectNumber].objNumber = objectNumber;
+						char * fname = strtok(NULL, delimiter);
+						strcpy(objectInformation[objectNumber].fileName, fname);
+					}
+					else if (strcmp(keyWord, "rx") == 0 || strcmp(keyWord, "ry") == 0 || strcmp(keyWord, "rz") == 0)
+					{
+						if (strcmp(keyWord, "rx") == 0)
+						{
+							float x = atof(strtok(NULL, delimiter));
+							if (x > objectInformation[objectNumber].rotationDegree)
+							{
+								objectInformation[objectNumber].rotationDegree = x;
+								objectInformation[objectNumber].rotationValueForObject.x = 1; // Rotate About X
+							}
+							
+						}
+						else if (strcmp(keyWord, "ry") == 0)
+						{
+							float y = atof(strtok(NULL, delimiter));
+							if (y > objectInformation[objectNumber].rotationDegree)
+							{
+								objectInformation[objectNumber].rotationDegree = y;
+								objectInformation[objectNumber].rotationValueForObject.y = 1; // Rotate About Y
+							}
+						}
+						else if (strcmp(keyWord, "rz") == 0)
+						{
+							float z = atof(strtok(NULL, delimiter));
+							if (z > objectInformation[objectNumber].rotationDegree)
+							{
+								objectInformation[objectNumber].rotationDegree = z;
+								objectInformation[objectNumber].rotationValueForObject.z = 1; // Rotate About Z
+							}
+							objectInformation[objectNumber].transformation = glm::rotate(objectInformation[objectNumber].transformation,
+								objectInformation[objectNumber].rotationDegree, 
+								vec3(objectInformation[objectNumber].rotationValueForObject.x, objectInformation[objectNumber].rotationValueForObject.y, objectInformation[objectNumber].rotationValueForObject.z));
+						}
+					}
+					else if (strcmp(keyWord, "t") == 0)
+					{
+						if (objectInformation[objectNumber].translationEnabled == 0)
+						{
+							objectInformation[objectNumber].translationEnabled = actionNumber;
+							actionNumber++;
+						}
+						objectInformation[objectNumber].transationValueForObject.x = atof(strtok(NULL, delimiter));
+						objectInformation[objectNumber].transationValueForObject.y = atof(strtok(NULL, delimiter));
+						objectInformation[objectNumber].transationValueForObject.z = atof(strtok(NULL, delimiter));
+						
+						objectInformation[objectNumber].transformation = glm::translate(objectInformation[objectNumber].transformation,
+							glm::vec3(objectInformation[objectNumber].transationValueForObject.x, objectInformation[objectNumber].transationValueForObject.y, objectInformation[objectNumber].transationValueForObject.z));
+					}
+					else if (strcmp(keyWord, "s") == 0)
+					{
+						if (objectInformation[objectNumber].scalingEnabled == 0)
+						{
+							objectInformation[objectNumber].scalingEnabled = actionNumber;
+							actionNumber++;
+						}
+						objectInformation[objectNumber].scalingValueForObject.x = atof(strtok(NULL, delimiter));
+						objectInformation[objectNumber].scalingValueForObject.y = atof(strtok(NULL, delimiter));
+						objectInformation[objectNumber].scalingValueForObject.z = atof(strtok(NULL, delimiter));
+
+						objectInformation[objectNumber].transformation = glm::scale(objectInformation[objectNumber].transformation,
+							glm::vec3(objectInformation[objectNumber].scalingValueForObject.x, objectInformation[objectNumber].scalingValueForObject.y, objectInformation[objectNumber].scalingValueForObject.z));
+					}
+					keyWord = strtok(NULL, delimiter);
+				}
+			}
+		}objectNumber++;
+	}
+}
+void printContentsOfObject()
+{
+	for (int i = 0; i < objectNumber; i++)
+	{
+		cout << endl << " Object Number :: " << objectInformation[i].objNumber;
+		cout << endl << " Object Name :: " << objectInformation[i].fileName;
+		
+		cout << endl << " Object Rotation Degree:: " << objectInformation[i].rotationDegree;
+		
+		cout << endl << " Rotation :: " << objectInformation[i].rotationValueForObject.x << " " << objectInformation[i].rotationValueForObject.y << " " << objectInformation[i].rotationValueForObject.z;
+		
+		cout << endl << " Scaling :: " << objectInformation[i].scalingValueForObject.x << " " << objectInformation[i].scalingValueForObject.y << " " << objectInformation[i].scalingValueForObject.z;
+		
+		cout << endl << " Translation :: " << objectInformation[i].transationValueForObject.x << " " << objectInformation[i].transationValueForObject.y << " " << objectInformation[i].transationValueForObject.z;
+
+	}
+}
 void printMaterialFile()
 {
 	struct materialValues  newMaterialValue;
@@ -286,8 +412,8 @@ void printVertexValues()
 		cout << endl << " Vertex :: " << i << endl;
 		for (int j = 0; j < 3; j++)
 		{
-			cout << vertices[i][j] << "  " ;
-			
+			cout << vertices[i][j] << "  ";
+
 		}
 	}
 }
@@ -331,7 +457,7 @@ void printFinalVertexValues()
 void printFacesValues()
 {
 	cout << endl;
-	int printNewLine=0;
+	int printNewLine = 0;
 	for (int i = 0; i < facesValue; i++)
 	{
 		if (printNewLine > 2)
@@ -389,7 +515,7 @@ string getValueTillSlash(int start, char* value)
 		{
 			break;
 		}
-		
+
 	}
 	return result;
 
@@ -397,7 +523,7 @@ string getValueTillSlash(int start, char* value)
 
 void computeNormalValues()
 {
-	for (int i = 0; i < vertexIndex; i=i+3)
+	for (int i = 0; i < vertexIndex; i = i + 3)
 	{
 		float u[3];
 		float v[3];
@@ -412,7 +538,7 @@ void readInputFile(char* fileName)
 	char *keyWord;
 	char *lineRead = (char*)malloc(100);
 	ifstream objectFile;
-	char* mtlLibName= (char*)malloc(100); // Will be the name of material LIB Fetched from .obj file
+	char* mtlLibName = (char*)malloc(100); // Will be the name of material LIB Fetched from .obj file
 
 	if ((fp = fopen(fileName, "r")) != NULL)
 	{
@@ -423,18 +549,18 @@ void readInputFile(char* fileName)
 		struct materialValues foundMaterialValue;
 		char * colorName;
 		while (!feof(fp))
-		{	
+		{
 			fgets(lineRead, 50, fp);
 			{
 				keyWord = strtok(lineRead, " ");
 				{
-					
-					while (keyWord  != NULL)
+
+					while (keyWord != NULL)
 					{
-						if (strcmp(keyWord,"mtllib") == 0 )
+						if (strcmp(keyWord, "mtllib") == 0)
 						{
 							mtlLibName = strtok(NULL, delimiter);
-							cout << endl <<  "Mat lib name ::"  << mtlLibName;
+							cout << endl << "Mat lib name ::" << mtlLibName;
 							readMaterialFile(mtlLibName);
 							//printMaterialFile(); //For Debugging
 						}
@@ -444,7 +570,7 @@ void readInputFile(char* fileName)
 							foundMaterialValue = getDetailsOfMaterial(colorName);
 							cout << endl << "ColorName ::" << foundMaterialValue.color;
 						}
-						else if (strcmp(keyWord,"v") == 0 )
+						else if (strcmp(keyWord, "v") == 0)
 						{
 							float xValue = atof(strtok(NULL, delimiter));
 							vertices[vertexIndex][0] = xValue;
@@ -483,10 +609,10 @@ void readInputFile(char* fileName)
 								computeNormalValues();
 							}
 							bool slashFormat = false;
-							lengthOfSlashes = 0, countOfSlashes=0; // Reset the values per iteration
+							lengthOfSlashes = 0, countOfSlashes = 0; // Reset the values per iteration
 							char * value = strtok(NULL, delimiter);
 							/* Check if format is v/vt/vn*/
-							
+
 							int i = 0;
 							while (value != NULL && value[i] != '\0')
 							{
@@ -500,7 +626,7 @@ void readInputFile(char* fileName)
 								i++;
 							}
 							// End
-							
+
 							if (slashFormat == true)
 							{
 								while (value != NULL)
@@ -514,7 +640,7 @@ void readInputFile(char* fileName)
 									}
 									i = 0;
 									int positionOfSlash = 0; // is it 1st 2nd or 3rd slash
-									while (i < lengthOfSlashes+ 1 && value != NULL && value[i] != NULL && value[i] != '\n' && value[i] != '\0')
+									while (i < lengthOfSlashes + 1 && value != NULL && value[i] != NULL && value[i] != '\n' && value[i] != '\0')
 									{
 										if (value[i] == '/')
 										{
@@ -524,7 +650,7 @@ void readInputFile(char* fileName)
 										if (positionOfSlash == 0)// 1st slash is for vertex info
 										{
 											//int val = value[i] - '0';
-											string result= getValueTillSlash(i,value);
+											string result = getValueTillSlash(i, value);
 											int vertexIndex = atoi(result.c_str()) - 1;
 											//cout << endl << result;
 											int length = result.length();
@@ -586,7 +712,7 @@ void readInputFile(char* fileName)
 											for (int colPos = 0; colPos < 3; colPos++)
 											{
 												float maxValue = 0.0f;
-												float multipliedValue = dot(finalVerticesNormals[finalNormalValue][colPos],lightSource[colPos]);
+												float multipliedValue = dot(finalVerticesNormals[finalNormalValue][colPos], lightSource[colPos]);
 												if (multipliedValue > maxValue)
 												{
 													maxValue = multipliedValue;
@@ -614,7 +740,7 @@ void readInputFile(char* fileName)
 									finalVertices[facesValue][2] = vertices[vertexIndex][2];
 									if (normalForFace > 5)
 									{
-										normalForFace =0;
+										normalForFace = 0;
 										getNormalForFacePos++;
 									}
 									finalVerticesNormals[finalNormalValue][0] = verticesNormal[getNormalForFacePos][0];
@@ -624,7 +750,7 @@ void readInputFile(char* fileName)
 									for (int colPos = 0; colPos < 3; colPos++)
 									{
 										float maxValue = 0.0f;
-										float multipliedValue = dot(finalVerticesNormals[finalNormalValue][colPos],lightSource[colPos]);
+										float multipliedValue = dot(finalVerticesNormals[finalNormalValue][colPos], lightSource[colPos]);
 										if (multipliedValue > maxValue)
 										{
 											maxValue = multipliedValue;
@@ -632,7 +758,7 @@ void readInputFile(char* fileName)
 										float result = foundMaterialValue.kd[colPos];// foundMaterialValue.ka[colPos] + (maxValue * foundMaterialValue.kd[colPos]);
 										verticesColor[finalNormalValue][colPos] = result;
 									}
-									
+
 									normalForFace++; finalNormalValue++;
 									facesValue++;
 									value = strtok(NULL, delimiter);
@@ -645,11 +771,11 @@ void readInputFile(char* fileName)
 			}
 		}
 		NumVertices = vertexIndex;// To keep Track of Number of Vertices , default is 0 . array is constructed using 300x3
-	
+
 	}
 	else
 	{
-		cout << endl <<" File Does not exist";
+		cout << endl << " File Does not exist";
 	}
 }
 static void special(unsigned char key, int x_cord, int y_cord)
@@ -682,10 +808,10 @@ static void special(unsigned char key, int x_cord, int y_cord)
 		viewUpVector = glm::rotate(viewUpVector, degree, glm::vec3(cameraX, cameraY, cameraZ));
 		break;
 	case 'z':
-		degree =  0.1f;
+		degree = 0.1f;
 		viewUpVector = glm::rotate(viewUpVector, -degree, glm::vec3(cameraX, cameraY, cameraZ));
 		break;
-	case 'u' :
+	case 'u':
 		cameraY = cameraY + 0.05f;
 		cameraX = cameraX + 0.05f;
 	case 'r':
@@ -694,19 +820,41 @@ static void special(unsigned char key, int x_cord, int y_cord)
 		lookupX = 0.0f, lookupY = 0.0f, lookupZ = 1.0f;
 		viewUpVector = { lookupX, lookupY, lookupZ };
 		nearDist = 0.1f, farDist = 100.0f;
-		degree = 0.0f; 
+		degree = 0.0f;
 		degree1 = cameraY / cameraX;
 		break;
 	case 'q':
 		exit(0);
 		break;
-	/*case 'x':
+		/*case 'x':
 		trans = glm::scale(trans, glm::vec3(1.5, 1.5, 1.5));
 		break;
-	*/
+		*/
 	default: return;
 	}
 	glutPostRedisplay();
+}
+void reshape(int screen_width, int screen_height)
+{
+	if (screen_height == 0)
+		screen_height = 1;
+	float ratio = 1.0* screen_width / screen_height;
+
+	// Use the Projection Matrix
+	glMatrixMode(GL_PROJECTION);
+
+	// Reset Matrix
+	glLoadIdentity();
+
+	// Set the viewport to be the entire window
+	glViewport(0, 0, screen_width, screen_height);
+
+	// Set the correct perspective.
+	gluPerspective(45, ratio, 1, 1000);
+
+	// Get Back to the Modelview
+	glMatrixMode(GL_MODELVIEW);
+
 }
 float getRadius()
 {
@@ -724,14 +872,14 @@ void handleSpecialKeypress(int key, int x, int y)
 		degree1 = degree1 + (3.14 / 180);
 		cameraX = radius * cos(degree1);
 		cameraY = radius * sin(degree1);
-		cout << endl << cameraX << " " << cameraY;
+		cout << endl << degree1 << cameraX << " " << cameraY;
 		break;
 	case GLUT_KEY_RIGHT:
 		radius = getRadius();
 		degree1 = degree1 - (3.14 / 180);
 		cameraX = radius * cos(degree1);
 		cameraY = radius * sin(degree1);
-		cout << endl << cameraX << " " << cameraY;
+		cout << endl << degree1 << "  " << cameraX << " " << cameraY;
 		break;
 	case GLUT_KEY_UP:
 		nearDist = nearDist + 0.1f;
@@ -749,7 +897,7 @@ void handleSpecialKeypress(int key, int x, int y)
 ////////////////////////////////////////////////////////////////////////
 int main(int argc, char* argv[])
 {
-	char* fileName;
+	char fileName[20];
 	glutInit(&argc, argv);
 	glutInitDisplayMode(GLUT_RGBA | GLUT_ALPHA | GLUT_DOUBLE | GLUT_DEPTH);
 	glEnable(GL_BLEND);
@@ -761,17 +909,60 @@ int main(int argc, char* argv[])
 	glutInitContextProfile(GLUT_CORE_PROFILE);// GLUT_COMPATIBILITY_PROFILE );
 	glutCreateWindow(argv[0]);
 	glewExperimental = GL_TRUE;	// added for glew to work!
-	
+
 	if (glewInit())
 	{
 		cerr << "Unable to initialize GLEW ... exiting" << endl;
 		exit(EXIT_FAILURE);
 	}
+	if (argc < 2)
+	{
+		cout << endl << " Wrong usage , pass parametes -c ControlFile.txt";
+	}
+	else
+	{
+		char * controlFileName;
+		controlFileName = argv[2];
+		cout << endl << " Entered File :: " << controlFileName;
+		readControlFIle(controlFileName);
+		//printContentsOfObject();
+	}
 
+
+	init();
+	printContentsOfObject();
+	// Code to read everything from the files specified by control file
+	for (int i = 0; i < objectNumber; i++)
+	{
+		strcpy(fileName, objectInformation[i].fileName);
+		readInputFile(fileName);
+		objectInformation[i].numberOfFaces = facesValue;
+
+		// Store all values required in buffer and then rreset values in arrays
+		storeValuesInBuffer(i);
+
+		//Reset the variables
+		vertexIndex = 0;
+		verticesNormalsIndex = 0;
+		facesValue = 0;
+		finalNormalValue = 0;
+		NumVertices = 0;
+
+
+		// Clear Out all arrays and reset the Variables and set it up for next iteration 
+		memset(vertices, 0, sizeof(vertices[0][0]) * _MAX_ROWS_ * 3);
+		memset(verticesNormal, 0, sizeof(verticesNormal[0][0]) * _MAX_ROWS_ * 3);
+		memset(finalVertices, 0, sizeof(finalVertices[0][0]) * _MAX_ROWS_ * 3);
+		memset(finalVerticesNormals, 0, sizeof(finalVerticesNormals[0][0]) * _MAX_ROWS_ * 3);
+		memset(faces, 0, sizeof(faces[0]) * _MAX_ROWS_);
+		memset(verticesColor, 0, sizeof(verticesColor[0][0]) * _MAX_ROWS_ * 3);
+	}
+	//printMaxAndMin();
+	cameraX = 3 * maxXRange;
+	cameraZ = 3 * maxYRange;
+	cameraY = 3 * maxZRange;
+	degree1 = cameraY / cameraX;
 	//Code to read data from File
-	fileName = "cube_multicolor2.obj";
-	readInputFile(fileName);
-	storeValuesInBuffer(objectNumber);
 
 	//printColors();
 	//printVertexNormalValues();
@@ -780,11 +971,12 @@ int main(int argc, char* argv[])
 	//printFinalVertexValues();
 	//printMaxAndMin();
 	// End
-	
-	init();
+
+	// Handle display seperately , put a loop of objectInformation inside that and store facesValue as part of objecctinformation
 	glutDisplayFunc(display);
 	glutKeyboardFunc(special);
 	glutSpecialFunc(handleSpecialKeypress);
+	//glutReshapeFunc(reshape);
 	glutMainLoop();
 	return 0;
 }
