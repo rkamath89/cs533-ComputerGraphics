@@ -18,12 +18,15 @@
 #define GLM_FORCE_RADIANS
 #include <glm/glm/glm.hpp>
 #include <glm/glm/gtc/matrix_transform.hpp>
+#include <glm/glm/gtx/transform.hpp>
+#include <glm/glm/gtx/rotate_vector.hpp>
 #include <glm/glm/gtc/type_ptr.hpp>
 using namespace std;
 using namespace glm;
 
 
 const int _MAX_ROWS_ = 1000;
+const int numberOfObjects = 10;
 struct materialValues
 {
 	char color[20];
@@ -38,11 +41,11 @@ int materialFileValuesIndex = 0;
 GLuint  vertexIndex = 0, facesValue = 0, finalNormalValue = 0, verticesNormalsIndex = 0;
 GLuint program;
 //enum VAO_IDs { Triangles, NumVAOs };
-const GLuint Triangles = 0, NumVAOs = 1;
+const GLuint Triangles_OBJECT = 0, NumVAOs = 10;
 //enum Buffer_IDs { ArrayBuffer, NumBuffers };
-const GLuint ArrayBuffer = 0, NumBuffers = 1;
+const GLuint ArrayBuffer = 0;
 //enum Attrib_IDs { vPosition = 0 };
-const GLuint vPosition = 0, vertexColor = 3;
+const GLuint vPosition = 0, vertexColor = 1;
 
 GLuint NumVertices = 0;
 GLfloat vertices[_MAX_ROWS_][3];
@@ -52,18 +55,38 @@ GLuint faces[_MAX_ROWS_];	GLuint facesBuffer[1];
 
 
 GLuint VAOs[NumVAOs] ;
+const int NumBuffers = 10;
 GLuint Buffers[NumBuffers];
-GLuint ColorBuffer[1];
+const int NumColorBuffers = 10;
+GLuint ColorBuffer[NumColorBuffers];
 
+float screen_width = 512.0f, screen_height = 512.0f;
 
+struct translationObject
+{
+	int objNumber;
+	glm::vec3 rotationValueForObject;
+	glm::vec3 scalingValueForObject;
+	glm::vec3 transationValueForObject;
+};
+int objectNumber = 0;
+struct translationObject objectInformation[numberOfObjects];
 
 
 GLint uniform_mvp;
-glm::mat4 model, view, projection, mvp,trans;
-float degree = 0;
+glm::mat4 model, view, projection, mvp, trans, revolve;
 char * delimiter = " ,'\n'";
 float maxXRange = 0.0f, minXRange = 999.0f, maxYRange = 0.0f, minYRange = 999.0f, maxZRange = 0.0f, minZRange = 999.0f;
-GLfloat cameraX = 6.0f, cameraY = 6.0f, cameraZ = 0.0f;
+
+GLfloat cameraX = 6.0f, cameraY = 6.0f, cameraZ = 6.0f;
+GLfloat focalX = 0.0f, focalY = 0.0f, focalZ = 0.0f;
+GLfloat lookupX = 0.0f, lookupY = 0.0f, lookupZ = 1.0f;
+glm::vec3 viewUpVector = { lookupX, lookupY, lookupZ };
+
+GLfloat nearDist = 0.1f, farDist = 100.0f;
+float degree = 0, degree1 = 0;
+
+
 
 // Colors also should have been parsed by Now
 GLfloat lightSource[3] = { 1.2f, -2.0f, -2.0f };
@@ -73,65 +96,60 @@ GLfloat verticesColor[_MAX_ROWS_][3];
 /////////////////////////////////////////////////////
 void init(void)
 {
-	
+	degree1 = cameraY / cameraX;
 	glMatrixMode(GL_PROJECTION);
 	ShaderInfo  shaders[] = {{ GL_VERTEX_SHADER, "triangles.vert" },{ GL_FRAGMENT_SHADER, "triangles.frag" },{ GL_NONE, NULL }};
 	program = LoadShaders(shaders);
 	glUseProgram(program);
-	
-	// By now we have parsed the .obj for all vertices
-	glGenVertexArrays(NumVAOs, VAOs);
-	glBindVertexArray(VAOs[Triangles]);
-	glGenBuffers(NumBuffers, Buffers); // Create 1 Buffer and put id in VAO's
-	glBindBuffer(GL_ARRAY_BUFFER, Buffers[ArrayBuffer]);
-	glBufferData(GL_ARRAY_BUFFER, sizeof(finalVertices), finalVertices, GL_DYNAMIC_DRAW);
-	// End of vertices
-	
-	
-
-	glGenBuffers(1, ColorBuffer);
-	glBindBuffer(GL_ARRAY_BUFFER, ColorBuffer[0]);
-	glBufferData(GL_ARRAY_BUFFER, sizeof(verticesColor), verticesColor, GL_STATIC_DRAW);
-	// End Of Color
-	
-	// Face values 
-	/*glGenBuffers(1, facesBuffer);
-	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, facesBuffer[0]);
-	glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(GLuint)*facesValue, faces, GL_STATIC_DRAW);*/
-	// End of Face
-	 
-
 	uniform_mvp = glGetUniformLocation(program, "mvp");
 
 }
+void storeValuesInBuffer(int objectNumber)
+{
+	glMatrixMode(GL_PROJECTION);
+	// By now we have parsed the .obj for all vertices
+	glGenVertexArrays(NumVAOs, VAOs);
+	glBindVertexArray(VAOs[objectNumber]);
+	glGenBuffers(NumBuffers, Buffers); // Create 1 Buffer and put id in VAO's
+	glBindBuffer(GL_ARRAY_BUFFER, Buffers[objectNumber]);
+	glBufferData(GL_ARRAY_BUFFER, sizeof(finalVertices), finalVertices, GL_DYNAMIC_DRAW);
+	// End of vertices
+	glGenBuffers(1, ColorBuffer);
+	glBindBuffer(GL_ARRAY_BUFFER, ColorBuffer[objectNumber]);
+	glBufferData(GL_ARRAY_BUFFER, sizeof(verticesColor), verticesColor, GL_STATIC_DRAW);
+	// End Of Color
+	
 
+}
 ////////////////////////////////////////////////////////////////////
 //	display
 ////////////////////////////////////////////////////////////////////
 void display(void)
 {
-	float screen_width = 512.0f, screen_height = 512.0f;
+	
 	glClearColor(1.0, 1.0, 1.0, 1.0);
 	glClearDepth(GL_DEPTH_BUFFER_BIT);
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 	
 	// Transformation
 
-	model = glm::translate(glm::mat4(1.0f), glm::vec3(0.0, 0.0,-4.0));// T from obj file else just identity mat
+	//model = glm::translate(glm::mat4(1.0f), glm::vec3(0.0, 0.0,-4.0));// T from obj file else just identity mat
 	//trans = glm::scale(trans, glm::vec3(1.5, 1.5, 1.5));
 	//trans = glm::translate(trans, glm::vec3(1.0f, 1.0f, 0.0f));
 	//view = glm::lookAt(glm::vec3(0.0, 0.0, 0.0), glm::vec3(0.0, 0.0, 0.0), glm::vec3(0.0, 1.0, 0.0));
 	/*Focal Point is at the Geometric center MAX+MIN/2*/
 	
-	float focalX, focalY, focalZ;
+	/*float focalX, focalY, focalZ;
 	focalX = (maxXRange + minXRange) / 2;
 	focalY = (maxYRange + minYRange) / 2;
-	focalZ = (maxZRange + minZRange) / 2;
+	focalZ = (maxZRange + minZRange) / 2;*/
 	//cout << "Focal :: " << focalX <<" " <<  focalY <<" " << focalZ;
 	//view = glm::lookAt(glm::vec3(maxXRange, maxYRange, maxZRange), glm::vec3(focalX, focalY, focalZ), glm::vec3(0.0, 1.0, 0.0));
-	view = glm::lookAt(glm::vec3(cameraX, cameraY, cameraZ), glm::vec3(0.0, 0.0, -4.0), glm::vec3(0.0, 0.0, 1.0));
-	projection = glm::perspective(45.0f, 1.0f*screen_width / screen_height, 0.1f, 100.0f);
-	mvp = projection * view * model * trans ;
+	model = glm::mat4(1.0f);
+	view = glm::lookAt(glm::vec3(cameraX, cameraY, cameraZ), glm::vec3(focalX, focalY, focalZ), viewUpVector);
+	//projection = glm::perspective(45.0f, 1.0f*screen_width / screen_height, 0.1f, 100.0f);
+	projection = glm::frustum(-0.1f, 0.1f, -0.1f, 0.1f, nearDist, farDist);
+	mvp = projection * view * model;
 	// End Transformation
 	glUseProgram(program);
 	glUniformMatrix4fv(uniform_mvp, 1, GL_FALSE, glm::value_ptr(mvp));
@@ -139,7 +157,7 @@ void display(void)
 
 
 	glEnableVertexAttribArray(vPosition);
-	glBindVertexArray(VAOs[Triangles]);
+	glBindVertexArray(VAOs[Triangles_OBJECT]);
 	glBindBuffer(GL_ARRAY_BUFFER, Buffers[ArrayBuffer]);
 	glVertexAttribPointer(
 		vPosition, // attribute
@@ -174,10 +192,6 @@ void display(void)
 	glFlush();
 }
 
-void fillUpColorArray()
-{
-
-}
 materialValues getDetailsOfMaterial(char *color)
 {
 	struct materialValues  tempMaterialValues;
@@ -380,6 +394,16 @@ string getValueTillSlash(int start, char* value)
 	return result;
 
 }
+
+void computeNormalValues()
+{
+	for (int i = 0; i < vertexIndex; i=i+3)
+	{
+		float u[3];
+		float v[3];
+		//u = vertices[1] - vertices[0];
+	}
+}
 void readInputFile(char* fileName)
 {
 	FILE * fp;
@@ -394,6 +418,7 @@ void readInputFile(char* fileName)
 	{
 		//vertex = 0;
 		facesValue = 0;
+		bool fileContainsVertexNormalValues = false;
 		int  normalForFace = 0, getNormalForFacePos = 0;
 		struct materialValues foundMaterialValue;
 		char * colorName;
@@ -432,6 +457,7 @@ void readInputFile(char* fileName)
 						}
 						else if (strcmp(keyWord, "vn") == 0)
 						{
+							fileContainsVertexNormalValues = true;
 							/*cout << endl;
 							cout << "Vertex Noraml X :: " << strtok(NULL, delimiter);
 							cout << "Vertex Noraml Y :: " << strtok(NULL, delimiter);
@@ -452,6 +478,10 @@ void readInputFile(char* fileName)
 						}
 						else if (strcmp(keyWord, "f") == 0)
 						{
+							if (fileContainsVertexNormalValues == false)
+							{
+								computeNormalValues();
+							}
 							bool slashFormat = false;
 							lengthOfSlashes = 0, countOfSlashes=0; // Reset the values per iteration
 							char * value = strtok(NULL, delimiter);
@@ -501,6 +531,34 @@ void readInputFile(char* fileName)
 											finalVertices[facesValue][0] = vertices[vertexIndex][0];
 											finalVertices[facesValue][1] = vertices[vertexIndex][1];
 											finalVertices[facesValue][2] = vertices[vertexIndex][2];
+											// Added to generate colors , Vn is not given in the file , need to compute it and it is / format [Vn will be blank]
+											// This is a crude and horrible way of doing this , need to figure out a better approach if time permits
+											if (fileContainsVertexNormalValues == false)
+											{
+												if (normalForFace > 5)
+												{
+													normalForFace = 0;
+													getNormalForFacePos++;
+												}
+												finalVerticesNormals[finalNormalValue][0] = verticesNormal[getNormalForFacePos][0];
+												finalVerticesNormals[finalNormalValue][1] = verticesNormal[getNormalForFacePos][1];
+												finalVerticesNormals[finalNormalValue][2] = verticesNormal[getNormalForFacePos][2];
+
+												for (int colPos = 0; colPos < 3; colPos++)
+												{
+													float maxValue = 0.0f;
+													float multipliedValue = dot(finalVerticesNormals[finalNormalValue][colPos], lightSource[colPos]);
+													if (multipliedValue > maxValue)
+													{
+														maxValue = multipliedValue;
+													}
+													float result = foundMaterialValue.kd[colPos];// foundMaterialValue.ka[colPos] + (maxValue * foundMaterialValue.kd[colPos]);
+													verticesColor[finalNormalValue][colPos] = result;
+												}
+
+												normalForFace++; finalNormalValue++;
+											}
+											// End 
 											facesValue++;
 											i = i + length;
 										}
@@ -528,12 +586,12 @@ void readInputFile(char* fileName)
 											for (int colPos = 0; colPos < 3; colPos++)
 											{
 												float maxValue = 0.0f;
-												float multipliedValue = finalVerticesNormals[finalNormalValue][colPos] * lightSource[colPos];
+												float multipliedValue = dot(finalVerticesNormals[finalNormalValue][colPos],lightSource[colPos]);
 												if (multipliedValue > maxValue)
 												{
 													maxValue = multipliedValue;
 												}
-												float result = foundMaterialValue.ka[colPos] + (maxValue * foundMaterialValue.kd[colPos]);
+												float result = foundMaterialValue.kd[colPos];// foundMaterialValue.ka[colPos] + (maxValue * foundMaterialValue.kd[colPos]);
 												verticesColor[finalNormalValue][colPos] = result;
 											}
 
@@ -566,12 +624,12 @@ void readInputFile(char* fileName)
 									for (int colPos = 0; colPos < 3; colPos++)
 									{
 										float maxValue = 0.0f;
-										float multipliedValue = finalVerticesNormals[finalNormalValue][colPos] * lightSource[colPos];
+										float multipliedValue = dot(finalVerticesNormals[finalNormalValue][colPos],lightSource[colPos]);
 										if (multipliedValue > maxValue)
 										{
 											maxValue = multipliedValue;
 										}
-										float result = foundMaterialValue.ka[colPos] + (maxValue * foundMaterialValue.kd[colPos]);
+										float result = foundMaterialValue.kd[colPos];// foundMaterialValue.ka[colPos] + (maxValue * foundMaterialValue.kd[colPos]);
 										verticesColor[finalNormalValue][colPos] = result;
 									}
 									
@@ -607,71 +665,127 @@ static void special(unsigned char key, int x_cord, int y_cord)
 		glLineWidth(1);
 		glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
 		break;
-	case 'r':
-		//GLfloat radius = 10.0f;
-		//GLfloat camX = 1;//sin(glfwGetTime()) * radius;
-		//GLfloat camZ = 1;//cos(glfwGetTime()) * radius;
-		//glm::mat4 view;
-		//view = glm::lookAt(glm::vec3(camX, 0.0, camZ), glm::vec3(0.0, 0.0, 0.0), glm::vec3(0.0, 1.0, 0.0));
-		break;	
+	case 'c':
+		cameraZ = cameraZ - 0.1f;
+		break;
+	case 'v':
+		cameraZ = cameraZ + 0.1f;
+		break;
+	case 'd':
+		focalZ = focalZ + 0.1f;
+		break;
+	case 'f':
+		focalZ = focalZ - 0.1f;
+		break;
+	case 'x':
+		degree = 0.1f;//(3.14 / 180);
+		viewUpVector = glm::rotate(viewUpVector, degree, glm::vec3(cameraX, cameraY, cameraZ));
+		break;
+	case 'z':
+		degree =  0.1f;
+		viewUpVector = glm::rotate(viewUpVector, -degree, glm::vec3(cameraX, cameraY, cameraZ));
+		break;
 	case 'u' :
 		cameraY = cameraY + 0.05f;
 		cameraX = cameraX + 0.05f;
-	case 'i':
-		cameraZ = cameraZ - 0.05f;
+	case 'r':
+		cameraX = 6.0f, cameraY = 6.0f, cameraZ = 6.0f;
+		focalX = 0.0f, focalY = 0.0f, focalZ = 0.0f;
+		lookupX = 0.0f, lookupY = 0.0f, lookupZ = 1.0f;
+		viewUpVector = { lookupX, lookupY, lookupZ };
+		nearDist = 0.1f, farDist = 100.0f;
+		degree = 0.0f; 
+		degree1 = cameraY / cameraX;
 		break;
-	case 'x':
+	case 'q':
+		exit(0);
+		break;
+	/*case 'x':
 		trans = glm::scale(trans, glm::vec3(1.5, 1.5, 1.5));
 		break;
-	case 'd':
-		//trans = glm::scale(trans, glm::vec3(1.5, 1.5, 1.5));
-		trans = glm::rotate(mat4(), degree++, vec3(0.0f, 0.0f, 1.0f));
+	*/
+	default: return;
+	}
+	glutPostRedisplay();
+}
+float getRadius()
+{
+	return sqrt(pow((cameraX - focalX), 2) + pow((cameraY - focalY), 2));
+}
+void handleSpecialKeypress(int key, int x, int y)
+{
+	int radius;
+	cout << " special kEY :: " << key << endl;
+	string clr;
+	switch (key)
+	{
+	case GLUT_KEY_LEFT:
+		radius = getRadius();
+		degree1 = degree1 + (3.14 / 180);
+		cameraX = radius * cos(degree1);
+		cameraY = radius * sin(degree1);
+		cout << endl << cameraX << " " << cameraY;
+		break;
+	case GLUT_KEY_RIGHT:
+		radius = getRadius();
+		degree1 = degree1 - (3.14 / 180);
+		cameraX = radius * cos(degree1);
+		cameraY = radius * sin(degree1);
+		cout << endl << cameraX << " " << cameraY;
+		break;
+	case GLUT_KEY_UP:
+		nearDist = nearDist + 0.1f;
+		break;
+	case GLUT_KEY_DOWN:
+		nearDist = nearDist - 0.1f;
 		break;
 	default: return;
 	}
 	glutPostRedisplay();
+
 }
 ////////////////////////////////////////////////////////////////////////
 //	main
 ////////////////////////////////////////////////////////////////////////
 int main(int argc, char* argv[])
 {
-
-	//Code to read data from File
-	char* fileName = "cube_single.obj";
-	readInputFile(fileName);
-	fillUpColorArray();
-	printColors();
-	//printVertexNormalValues();
-	//printVertexValues();
-	//printFacesValues();
-	//printFinalVertexValues();
-	//printMaxAndMin();
-	// End
-
+	char* fileName;
 	glutInit(&argc, argv);
 	glutInitDisplayMode(GLUT_RGBA | GLUT_ALPHA | GLUT_DOUBLE | GLUT_DEPTH);
 	glEnable(GL_BLEND);
 	glEnable(GL_DEPTH_TEST);
 	glDepthFunc(GL_LESS);
+	glDepthMask(GL_TRUE);
 	glutInitWindowSize(512, 512);
 	glutInitContextVersion(4, 3);
 	glutInitContextProfile(GLUT_CORE_PROFILE);// GLUT_COMPATIBILITY_PROFILE );
 	glutCreateWindow(argv[0]);
-
 	glewExperimental = GL_TRUE;	// added for glew to work!
+	
 	if (glewInit())
 	{
 		cerr << "Unable to initialize GLEW ... exiting" << endl;
 		exit(EXIT_FAILURE);
 	}
 
+	//Code to read data from File
+	fileName = "cube_multicolor2.obj";
+	readInputFile(fileName);
+	storeValuesInBuffer(objectNumber);
+
+	//printColors();
+	//printVertexNormalValues();
+	//printVertexValues();
+	//printFacesValues();
+	//printFinalVertexValues();
+	//printMaxAndMin();
+	// End
 	
 	init();
 	glutDisplayFunc(display);
 	glutKeyboardFunc(special);
+	glutSpecialFunc(handleSpecialKeypress);
 	glutMainLoop();
-
 	return 0;
 }
 
