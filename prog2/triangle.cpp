@@ -5,7 +5,7 @@
 //////////////////////////////////////////////////////////
 #define _CRT_SECURE_NO_DEPRECATE
 #include <iostream>
-
+#include <numeric>
 #include "vgl.h"
 #include "LoadShaders.h"
 #include<fstream>
@@ -27,10 +27,11 @@ using namespace glm;
 
 const int _MAX_ROWS_ = 1000;
 const int numberOfObjects = 10;
-
+int mtlNumber = 1;// Just to see if initialized
 
 struct materialValues
 {
+	int materilNumber;
 	char color[20];
 	float ka[3];// = { 0.1f, 0.1f, 0.1f };// Default value as per specs
 	float kd[3];// = { 0.9f, 0.9f, 0.9f };// Default value as per specs
@@ -91,7 +92,7 @@ float degree = 0, degree1 = 0;
 // Default camera values End
 
 
-GLfloat lightSource[3] = { 1.2f, -2.0f, -2.0f };
+vec3 lightSource = { 1.0f, 1.0f, 1.0f };
 
 
 char * delimiter = " ,'\n'";
@@ -102,14 +103,16 @@ void init(void)
 {
 	degree1 = cameraY / cameraX;
 	glMatrixMode(GL_PROJECTION);
+	glEnable(GL_DEPTH_TEST);
+	glDepthFunc(GL_LESS);
 	ShaderInfo  shaders[] = { { GL_VERTEX_SHADER, "triangles.vert" }, { GL_FRAGMENT_SHADER, "triangles.frag" }, { GL_NONE, NULL } };
 	program = LoadShaders(shaders);
 	glUseProgram(program);
 	uniform_mvp = glGetUniformLocation(program, "mvp");
 	
-	glGenVertexArrays(9, VAOs);
-	glGenBuffers(9, Buffers); // Create 1 Buffer and put id in VAO's
-	glGenBuffers(9, ColorBuffer);
+	glGenVertexArrays(numberOfObjects, VAOs);
+	glGenBuffers(numberOfObjects, Buffers); // Create 1 Buffer and put id in VAO's
+	glGenBuffers(numberOfObjects, ColorBuffer);
 
 
 }
@@ -139,33 +142,25 @@ void display(void)
 	glClearColor(1.0, 1.0, 1.0, 1.0);
 	glClearDepth(GL_DEPTH_BUFFER_BIT);
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-	
-	// Transformation
+
 	for (int i = 0; i < objectNumber; i++)
 	{
 
-		//model = glm::translate(glm::mat4(1.0f), glm::vec3(0.0, 0.0,-4.0));// T from obj file else just identity mat
-		//trans = glm::scale(trans, glm::vec3(1.5, 1.5, 1.5));
-		//trans = glm::translate(trans, glm::vec3(1.0f, 1.0f, 0.0f));
-		//view = glm::lookAt(glm::vec3(0.0, 0.0, 0.0), glm::vec3(0.0, 0.0, 0.0), glm::vec3(0.0, 1.0, 0.0));
 		/*Focal Point is at the Geometric center MAX+MIN/2*/
-
 		/*float focalX, focalY, focalZ;
 		focalX = (maxXRange + minXRange) / 2;
 		focalY = (maxYRange + minYRange) / 2;
 		focalZ = (maxZRange + minZRange) / 2;*/
 		//cout << "Focal :: " << focalX <<" " <<  focalY <<" " << focalZ;
-		//view = glm::lookAt(glm::vec3(maxXRange, maxYRange, maxZRange), glm::vec3(focalX, focalY, focalZ), glm::vec3(0.0, 1.0, 0.0));
+
 		model = glm::mat4(1.0f);
 		view = glm::lookAt(glm::vec3(cameraX, cameraY, cameraZ), glm::vec3(focalX, focalY, focalZ), viewUpVector);
 		//projection = glm::perspective(45.0f, 1.0f*screen_width / screen_height, nearDist, farDist);
 		projection = glm::frustum(-0.1f, 0.1f, -0.1f, 0.1f, nearDist, farDist);
 		mvp = projection * view * model * objectInformation[i].transformation;
-		// End Transformation
+		
 		glUseProgram(program);
 		glUniformMatrix4fv(uniform_mvp, 1, GL_FALSE, glm::value_ptr(mvp));
-
-
 
 		glEnableVertexAttribArray(vPosition);
 		glBindVertexArray(VAOs[i]);
@@ -190,11 +185,6 @@ void display(void)
 			0                  // offset of first element
 			);
 
-		/* Push each element in buffer_vertices to the vertex shader */
-		/*glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, facesBuffer[0]);
-		int size;  glGetBufferParameteriv(GL_ELEMENT_ARRAY_BUFFER, GL_BUFFER_SIZE, &size);
-		cout << endl << " Faces Size :: " << facesValue << " size" << size << endl;
-		glDrawElements(GL_TRIANGLES, size / sizeof(GLuint), GL_UNSIGNED_INT, 0);*/
 		glDrawArrays(GL_TRIANGLES, 0, objectInformation[i].numberOfFaces);
 		glDisableVertexAttribArray(vPosition);
 		glDisableVertexAttribArray(vertexColor);
@@ -247,7 +237,7 @@ void readMaterialFile(char* fileName)
 					{
 						char *colorName = strtok(NULL, "\n");
 						strcpy(newMaterialValue.color, colorName);
-
+						newMaterialValue.materilNumber = mtlNumber++;
 					}
 					else if (strcmp(keyWord, "Ka") == 0)
 					{
@@ -520,19 +510,65 @@ string getValueTillSlash(int start, char* value)
 	return result;
 
 }
-
-void computeNormalValues()
+float getDotProduct(vec3 normalizedLight, vec3 normalizedNormal)
 {
-	for (int i = 0; i < vertexIndex; i = i + 3)
-	{
-		float u[3];
-		float v[3];
-		//u = vertices[1] - vertices[0];
-	}
+	return ((normalizedLight.x * normalizedNormal.x) +
+		(normalizedLight.y * normalizedNormal.y) +
+		(normalizedLight.z * normalizedNormal.z));
 }
+void fillNormalArrayAndComputeColor(int size, struct materialValues fetchedMaterialValues,vec3 calculatedNormal)
+{
+	vec3 normalizedNormal = normalize(calculatedNormal);
+	vec3 normalizedLight = normalize(lightSource);
+	float diffuseCoefficient = getDotProduct(normalizedLight, normalizedNormal);
+
+	vec3 finalColor = vec3(fetchedMaterialValues.ka[0], fetchedMaterialValues.ka[1], fetchedMaterialValues.ka[2]) +
+								( (max(diffuseCoefficient, 0.0f)) * (vec3(fetchedMaterialValues.kd[0], fetchedMaterialValues.kd[1], fetchedMaterialValues.kd[2])));
+	for (int i = finalNormalValue; i < finalNormalValue+3; i++)
+	{
+		finalVerticesNormals[i][0] = calculatedNormal.x;
+		finalVerticesNormals[i][1] = calculatedNormal.y;
+		finalVerticesNormals[i][2] = calculatedNormal.z;
+		verticesColor[i][0] = fetchedMaterialValues.kd[0];//finalColor.x;
+		verticesColor[i][1] = fetchedMaterialValues.kd[1]; //finalColor.y;
+		verticesColor[i][2] = fetchedMaterialValues.kd[2]; //finalColor.z;
+	}
+	
+	finalNormalValue = finalNormalValue + 3;
+
+}
+vec3 computeNormalValues(int readFaces ,struct materialValues fetchedMaterialValues)
+{
+
+	vec3 edge1;
+	vec3 edge2;
+	vec3 calculatedNormal;
+
+	edge1.x = vertices[readFaces - 1][0] - vertices[readFaces - 3][0];
+	edge1.y = vertices[readFaces - 1][1] - vertices[readFaces - 3][1];
+	edge1.z = vertices[readFaces - 1][2] - vertices[readFaces - 3][2];
+
+	edge2.x = vertices[readFaces - 2][0] - vertices[readFaces - 3][0];
+	edge2.y = vertices[readFaces - 2][1] - vertices[readFaces - 3][1];
+	edge2.z = vertices[readFaces - 2][2] - vertices[readFaces - 3][2];
+
+	calculatedNormal = cross(edge1, edge2);
+	//vec3 normalizedNormal = normalize(calculatedNormal);
+	//cout << " \n Calculated Edge1 : " << edge1.x << " " << edge1.y << " " << edge1.z ;
+	//cout << " \n Calculated Edge2 : " << edge2.x << " " << edge2.y << " " << edge2.z;
+	//cout << "\nNormal ::" << calculatedNormal.x << " " << calculatedNormal.y << " " << calculatedNormal.z;
+	//cout << "\n Normalized Normal ::" << normalizedNormal.x << " " << normalizedNormal.y << " " << normalizedNormal.z;
+	
+	fillNormalArrayAndComputeColor(readFaces, fetchedMaterialValues, calculatedNormal);
+
+
+	return calculatedNormal;
+}
+
 void readInputFile(char* fileName)
 {
 	FILE * fp;
+	bool materialValueFound = false;
 	int countOfSlashes = 0, lengthOfSlashes = 0;
 	char *token;
 	char *keyWord;
@@ -552,6 +588,7 @@ void readInputFile(char* fileName)
 		{
 			fgets(lineRead, 50, fp);
 			{
+				int vertexNumber = 0;
 				keyWord = strtok(lineRead, " ");
 				{
 
@@ -568,7 +605,8 @@ void readInputFile(char* fileName)
 						{
 							colorName = strtok(NULL, delimiter);
 							foundMaterialValue = getDetailsOfMaterial(colorName);
-							cout << endl << "ColorName ::" << foundMaterialValue.color;
+							materialValueFound = true;
+							//cout << endl << "ColorName ::" << foundMaterialValue.color;
 						}
 						else if (strcmp(keyWord, "v") == 0)
 						{
@@ -604,10 +642,6 @@ void readInputFile(char* fileName)
 						}
 						else if (strcmp(keyWord, "f") == 0)
 						{
-							if (fileContainsVertexNormalValues == false)
-							{
-								computeNormalValues();
-							}
 							bool slashFormat = false;
 							lengthOfSlashes = 0, countOfSlashes = 0; // Reset the values per iteration
 							char * value = strtok(NULL, delimiter);
@@ -657,34 +691,24 @@ void readInputFile(char* fileName)
 											finalVertices[facesValue][0] = vertices[vertexIndex][0];
 											finalVertices[facesValue][1] = vertices[vertexIndex][1];
 											finalVertices[facesValue][2] = vertices[vertexIndex][2];
-											// Added to generate colors , Vn is not given in the file , need to compute it and it is / format [Vn will be blank]
-											// This is a crude and horrible way of doing this , need to figure out a better approach if time permits
+											// End 
 											if (fileContainsVertexNormalValues == false)
 											{
-												if (normalForFace > 5)
+												// Group 3 vertex and get the normal
+												vertexNumber++;
+												if (vertexNumber > 2)
 												{
-													normalForFace = 0;
-													getNormalForFacePos++;
-												}
-												finalVerticesNormals[finalNormalValue][0] = verticesNormal[getNormalForFacePos][0];
-												finalVerticesNormals[finalNormalValue][1] = verticesNormal[getNormalForFacePos][1];
-												finalVerticesNormals[finalNormalValue][2] = verticesNormal[getNormalForFacePos][2];
-
-												for (int colPos = 0; colPos < 3; colPos++)
-												{
-													float maxValue = 0.0f;
-													float multipliedValue = dot(finalVerticesNormals[finalNormalValue][colPos], lightSource[colPos]);
-													if (multipliedValue > maxValue)
+													vertexNumber = 0;
+													if (materialValueFound == false)
 													{
-														maxValue = multipliedValue;
+														//cout << endl << " No color Use Default";
+														strcpy(foundMaterialValue.color, "default");
+														foundMaterialValue.ka[0] = 0.1f, foundMaterialValue.ka[1] = 0.1f, foundMaterialValue.ka[2] = 0.1f;
+														foundMaterialValue.kd[0] = 0.9f, foundMaterialValue.kd[1] = 0.9f, foundMaterialValue.kd[2] = 0.9f;
 													}
-													float result = foundMaterialValue.kd[colPos];// foundMaterialValue.ka[colPos] + (maxValue * foundMaterialValue.kd[colPos]);
-													verticesColor[finalNormalValue][colPos] = result;
+													computeNormalValues(facesValue, foundMaterialValue);
 												}
-
-												normalForFace++; finalNormalValue++;
 											}
-											// End 
 											facesValue++;
 											i = i + length;
 										}
@@ -709,17 +733,41 @@ void readInputFile(char* fileName)
 											finalVerticesNormals[finalNormalValue][1] = verticesNormal[vertexIndex][1];
 											finalVerticesNormals[finalNormalValue][2] = verticesNormal[vertexIndex][2];
 
-											for (int colPos = 0; colPos < 3; colPos++)
+											//for (int colPos = 0; colPos < 3; colPos++)
+											//{
+											//	float maxValue = 0.0f;
+											//	/*float multipliedValue = dot(finalVerticesNormals[finalNormalValue][colPos], lightSource[colPos]);
+											//	if (multipliedValue > maxValue)
+											//	{
+											//		maxValue = multipliedValue;
+											//	}*/
+											//	if (materialValueFound == false)
+											//	{
+											//		//cout << endl << " No color Use Default";
+											//		strcpy(foundMaterialValue.color, "default");
+											//		foundMaterialValue.ka[0] = 0.1f, foundMaterialValue.ka[1] = 0.1f, foundMaterialValue.ka[2] = 0.1f;
+											//		foundMaterialValue.kd[0] = 0.9f, foundMaterialValue.kd[1] = 0.9f, foundMaterialValue.kd[2] = 0.9f;
+											//	}
+											//	float result = foundMaterialValue.kd[colPos];// foundMaterialValue.ka[colPos] + (maxValue * foundMaterialValue.kd[colPos]);
+											//	verticesColor[finalNormalValue][colPos] = result;
+											//}
+											float maxValue = 0.0f;
+											vec3 lightSrcNormalized = normalize(lightSource);
+											vec3 normalNormalized = normalize(vec3(finalVerticesNormals[finalNormalValue][0], finalVerticesNormals[finalNormalValue][1], finalVerticesNormals[finalNormalValue][2]));
+											float coefficient = getDotProduct(lightSrcNormalized, normalNormalized);
+											if (materialValueFound == false)
 											{
-												float maxValue = 0.0f;
-												float multipliedValue = dot(finalVerticesNormals[finalNormalValue][colPos], lightSource[colPos]);
-												if (multipliedValue > maxValue)
-												{
-													maxValue = multipliedValue;
-												}
-												float result = foundMaterialValue.kd[colPos];// foundMaterialValue.ka[colPos] + (maxValue * foundMaterialValue.kd[colPos]);
-												verticesColor[finalNormalValue][colPos] = result;
+												//cout << endl << " No color Use Default";
+												strcpy(foundMaterialValue.color, "default");
+												foundMaterialValue.ka[0] = 0.1f, foundMaterialValue.ka[1] = 0.1f, foundMaterialValue.ka[2] = 0.1f;
+												foundMaterialValue.kd[0] = 0.9f, foundMaterialValue.kd[1] = 0.9f, foundMaterialValue.kd[2] = 0.9f;
 											}
+											vec3 colorComputed = vec3(foundMaterialValue.ka[0], foundMaterialValue.ka[1], foundMaterialValue.ka[2]) +
+												((max(coefficient, 0.0f)) * (vec3(foundMaterialValue.kd[0], foundMaterialValue.kd[1], foundMaterialValue.kd[2])));
+												//float result = foundMaterialValue.kd[colPos];// foundMaterialValue.ka[colPos] + (maxValue * foundMaterialValue.kd[colPos]);
+											verticesColor[finalNormalValue][0] = colorComputed.x;
+											verticesColor[finalNormalValue][1] = colorComputed.y;
+											verticesColor[finalNormalValue][2] = colorComputed.z;
 
 											finalNormalValue++;
 											i = i + length;
@@ -738,30 +786,22 @@ void readInputFile(char* fileName)
 									finalVertices[facesValue][0] = vertices[vertexIndex][0];
 									finalVertices[facesValue][1] = vertices[vertexIndex][1];
 									finalVertices[facesValue][2] = vertices[vertexIndex][2];
-									if (normalForFace > 5)
-									{
-										normalForFace = 0;
-										getNormalForFacePos++;
-									}
-									finalVerticesNormals[finalNormalValue][0] = verticesNormal[getNormalForFacePos][0];
-									finalVerticesNormals[finalNormalValue][1] = verticesNormal[getNormalForFacePos][1];
-									finalVerticesNormals[finalNormalValue][2] = verticesNormal[getNormalForFacePos][2];
-
-									for (int colPos = 0; colPos < 3; colPos++)
-									{
-										float maxValue = 0.0f;
-										float multipliedValue = dot(finalVerticesNormals[finalNormalValue][colPos], lightSource[colPos]);
-										if (multipliedValue > maxValue)
-										{
-											maxValue = multipliedValue;
-										}
-										float result = foundMaterialValue.kd[colPos];// foundMaterialValue.ka[colPos] + (maxValue * foundMaterialValue.kd[colPos]);
-										verticesColor[finalNormalValue][colPos] = result;
-									}
-
-									normalForFace++; finalNormalValue++;
 									facesValue++;
 									value = strtok(NULL, delimiter);
+									// Group 3 vertex and get the normal
+									vertexNumber++;
+									if (vertexNumber > 2)
+									{
+										vertexNumber = 0;
+										if (materialValueFound == false)
+										{
+											//cout << endl << " No color Use Default";
+											strcpy(foundMaterialValue.color, "default");
+											foundMaterialValue.ka[0] = 0.1f, foundMaterialValue.ka[1] = 0.1f, foundMaterialValue.ka[2] = 0.1f;
+											foundMaterialValue.kd[0] = 0.9f, foundMaterialValue.kd[1] = 0.9f, foundMaterialValue.kd[2] = 0.9f;
+										}
+										computeNormalValues(facesValue, foundMaterialValue);
+									}
 								}
 							}
 						}
@@ -778,6 +818,8 @@ void readInputFile(char* fileName)
 		cout << endl << " File Does not exist";
 	}
 }
+
+
 static void special(unsigned char key, int x_cord, int y_cord)
 {
 	cout << " kEY :: " << key << endl;
@@ -811,11 +853,9 @@ static void special(unsigned char key, int x_cord, int y_cord)
 		degree = 0.1f;
 		viewUpVector = glm::rotate(viewUpVector, -degree, glm::vec3(cameraX, cameraY, cameraZ));
 		break;
-	case 'u':
-		cameraY = cameraY + 0.05f;
-		cameraX = cameraX + 0.05f;
 	case 'r':
-		cameraX = 6.0f, cameraY = 6.0f, cameraZ = 6.0f;
+		
+		cameraX = 3 * maxXRange, cameraY = 3 * maxYRange, cameraZ = 3 * maxZRange;
 		focalX = 0.0f, focalY = 0.0f, focalZ = 0.0f;
 		lookupX = 0.0f, lookupY = 0.0f, lookupZ = 1.0f;
 		viewUpVector = { lookupX, lookupY, lookupZ };
@@ -862,7 +902,7 @@ float getRadius()
 }
 void handleSpecialKeypress(int key, int x, int y)
 {
-	int radius;
+	float radius;
 	cout << " special kEY :: " << key << endl;
 	string clr;
 	switch (key)
@@ -872,7 +912,7 @@ void handleSpecialKeypress(int key, int x, int y)
 		degree1 = degree1 + (3.14 / 180);
 		cameraX = radius * cos(degree1);
 		cameraY = radius * sin(degree1);
-		cout << endl << degree1 << cameraX << " " << cameraY;
+		cout << endl << radius << " " <<  degree1 << "  " << cameraX << " " << cameraY;
 		break;
 	case GLUT_KEY_RIGHT:
 		radius = getRadius();
@@ -930,14 +970,15 @@ int main(int argc, char* argv[])
 
 
 	init();
-	printContentsOfObject();
+	//printContentsOfObject();
 	// Code to read everything from the files specified by control file
 	for (int i = 0; i < objectNumber; i++)
 	{
 		strcpy(fileName, objectInformation[i].fileName);
 		readInputFile(fileName);
 		objectInformation[i].numberOfFaces = facesValue;
-
+		//printVertexNormalValues();
+		//printColors();
 		// Store all values required in buffer and then rreset values in arrays
 		storeValuesInBuffer(i);
 
