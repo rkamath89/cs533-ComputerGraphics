@@ -25,7 +25,7 @@ using namespace std;
 using namespace glm;
 
 
-const int _MAX_ROWS_ = 1000;
+const int _MAX_ROWS_ = 1000000;
 const int numberOfObjects = 10;
 int mtlNumber = 1;// Just to see if initialized
 
@@ -63,8 +63,9 @@ float screen_width = 512.0f, screen_height = 512.0f;
 struct translationObject
 {
 	int objNumber;
+	char path[200];
 	int numberOfFaces;// Number of vertices actually
-	char fileName[20];
+	char fileName[200];
 	float rotationDegree = 0;
 	glm::vec3 rotationValueForObject;
 	int scalingEnabled = 0;
@@ -81,6 +82,8 @@ GLint uniform_mvp;
 glm::mat4 model, view, projection, mvp;
 
 float maxXRange = 0.0f, minXRange = 999.0f, maxYRange = 0.0f, minYRange = 999.0f, maxZRange = 0.0f, minZRange = 999.0f;
+float sumOfX = 0.0f, sumOfY = 0.0f, sumOfZ = 0.0f;
+int numberOfX = 0, numberOfY = 0, numberOfZ = 0;
 
 // Default camera values
 GLfloat cameraX = 0.0f, cameraY = 0.0f, cameraZ = 0.0f;
@@ -92,7 +95,7 @@ float degree = 0, degree1 = 0;
 // Default camera values End
 
 
-vec3 lightSource = { 1.0f, 1.0f, 1.0f };
+vec3 lightSource = { 11.0f, 11.0f, 11.0f };
 
 
 char * delimiter = " ,'\n'";
@@ -223,7 +226,7 @@ void readMaterialFile(char* fileName)
 	{
 		while (!feof(fp))
 		{
-			fgets(lineRead, 50, fp);
+			fgets(lineRead, 100, fp);
 			{
 				struct materialValues  newMaterialValue;
 				//Initialize Default values
@@ -285,8 +288,9 @@ void readControlFIle(char* fileName)
 		int actionNumber = 1;
 		while (!feof(fp))
 		{
-			fgets(lineRead, 50, fp);
+			fgets(lineRead, 100, fp);
 			{
+				bool rotationApplied = false;
 				keyWord = strtok(lineRead, delimiter);
 				while (keyWord != NULL)
 				{
@@ -296,10 +300,27 @@ void readControlFIle(char* fileName)
 						objectNumber++;
 						objectInformation[objectNumber].objNumber = objectNumber;
 						char * fname = strtok(NULL, delimiter);
-						strcpy(objectInformation[objectNumber].fileName, fname);
+						strcpy(objectInformation[objectNumber].fileName, fname);	// USE ENTIRE TOKEN IN LINUX BOX
+
+
+						// UNCOMMENT ON LINUX BOX
+						// Finux File Format
+						/*cout << endl << " Fetching File path";
+						string keyWordString(fname);
+						unsigned found = keyWordString.find_last_of("/\\");
+						//printf("\nPath ::  %s", keyWordString.substr(0, found + 1).c_str());
+						cout << endl << "Done";
+						strcpy(objectInformation[objectNumber].path,keyWordString.substr(0, found + 1).c_str());
+						//printf("\n %s", keyWordString.substr(found + 1, keyWordString.length()).c_str());
+						//objectInformation[objectNumber].
+						*/
+						// Finux File Format
+
+						
 					}
 					else if (strcmp(keyWord, "rx") == 0 || strcmp(keyWord, "ry") == 0 || strcmp(keyWord, "rz") == 0)
 					{
+						rotationApplied = true;
 						if (strcmp(keyWord, "rx") == 0)
 						{
 							float x = atof(strtok(NULL, delimiter));
@@ -327,9 +348,7 @@ void readControlFIle(char* fileName)
 								objectInformation[objectNumber].rotationDegree = z;
 								objectInformation[objectNumber].rotationValueForObject.z = 1; // Rotate About Z
 							}
-							objectInformation[objectNumber].transformation = glm::rotate(objectInformation[objectNumber].transformation,
-								objectInformation[objectNumber].rotationDegree, 
-								vec3(objectInformation[objectNumber].rotationValueForObject.x, objectInformation[objectNumber].rotationValueForObject.y, objectInformation[objectNumber].rotationValueForObject.z));
+							
 						}
 					}
 					else if (strcmp(keyWord, "t") == 0)
@@ -361,6 +380,13 @@ void readControlFIle(char* fileName)
 							glm::vec3(objectInformation[objectNumber].scalingValueForObject.x, objectInformation[objectNumber].scalingValueForObject.y, objectInformation[objectNumber].scalingValueForObject.z));
 					}
 					keyWord = strtok(NULL, delimiter);
+					if (keyWord == NULL && rotationApplied == true)
+					{
+						rotationApplied = false;
+						objectInformation[objectNumber].transformation = glm::rotate(objectInformation[objectNumber].transformation,
+							objectInformation[objectNumber].rotationDegree,
+							vec3(objectInformation[objectNumber].rotationValueForObject.x, objectInformation[objectNumber].rotationValueForObject.y, objectInformation[objectNumber].rotationValueForObject.z));
+					}
 				}
 			}
 		}objectNumber++;
@@ -486,10 +512,12 @@ void computeTheMaxAndMin(float x, float y, float z)
 		minZRange = z;
 	}
 }
-void printMaxAndMin()
+void printMaxAndMinAndCenter()
 {
 	cout << endl << "MAX ::" << maxXRange << " " << maxYRange << " " << maxZRange << endl;
 	cout << endl << "MIN ::" << minXRange << " " << minYRange << " " << minZRange << endl;
+	cout << endl;
+	cout << endl << " Center-X : " << focalX << " Center-Y : " << focalY << " Center-Z : " << focalZ;
 }
 string getValueTillSlash(int start, char* value)
 {
@@ -529,9 +557,9 @@ void fillNormalArrayAndComputeColor(int size, struct materialValues fetchedMater
 		finalVerticesNormals[i][0] = calculatedNormal.x;
 		finalVerticesNormals[i][1] = calculatedNormal.y;
 		finalVerticesNormals[i][2] = calculatedNormal.z;
-		verticesColor[i][0] = fetchedMaterialValues.kd[0];//finalColor.x;
-		verticesColor[i][1] = fetchedMaterialValues.kd[1]; //finalColor.y;
-		verticesColor[i][2] = fetchedMaterialValues.kd[2]; //finalColor.z;
+		verticesColor[i][0] = finalColor.x;// fetchedMaterialValues.kd[0];//finalColor.x;
+		verticesColor[i][1] = finalColor.y; //fetchedMaterialValues.kd[1]; //finalColor.y;
+		verticesColor[i][2] = finalColor.z; //fetchedMaterialValues.kd[2]; //finalColor.z;
 	}
 	
 	finalNormalValue = finalNormalValue + 3;
@@ -544,15 +572,15 @@ vec3 computeNormalValues(int readFaces ,struct materialValues fetchedMaterialVal
 	vec3 edge2;
 	vec3 calculatedNormal;
 
-	edge1.x = vertices[readFaces - 1][0] - vertices[readFaces - 3][0];
-	edge1.y = vertices[readFaces - 1][1] - vertices[readFaces - 3][1];
-	edge1.z = vertices[readFaces - 1][2] - vertices[readFaces - 3][2];
+	edge1.x = finalVertices[readFaces - 1][0] - finalVertices[readFaces - 3][0];
+	edge1.y = finalVertices[readFaces - 1][1] - finalVertices[readFaces - 3][1];
+	edge1.z = finalVertices[readFaces - 1][2] - finalVertices[readFaces - 3][2];
 
-	edge2.x = vertices[readFaces - 2][0] - vertices[readFaces - 3][0];
-	edge2.y = vertices[readFaces - 2][1] - vertices[readFaces - 3][1];
-	edge2.z = vertices[readFaces - 2][2] - vertices[readFaces - 3][2];
+	edge2.x = finalVertices[readFaces - 2][0] - finalVertices[readFaces - 3][0];
+	edge2.y = finalVertices[readFaces - 2][1] - finalVertices[readFaces - 3][1];
+	edge2.z = finalVertices[readFaces - 2][2] - finalVertices[readFaces - 3][2];
 
-	calculatedNormal = cross(edge1, edge2);
+	calculatedNormal = cross(edge2, edge1);
 	//vec3 normalizedNormal = normalize(calculatedNormal);
 	//cout << " \n Calculated Edge1 : " << edge1.x << " " << edge1.y << " " << edge1.z ;
 	//cout << " \n Calculated Edge2 : " << edge2.x << " " << edge2.y << " " << edge2.z;
@@ -565,7 +593,7 @@ vec3 computeNormalValues(int readFaces ,struct materialValues fetchedMaterialVal
 	return calculatedNormal;
 }
 
-void readInputFile(char* fileName)
+void readInputFile(char* fileName,char* filePath)
 {
 	FILE * fp;
 	bool materialValueFound = false;
@@ -575,7 +603,6 @@ void readInputFile(char* fileName)
 	char *lineRead = (char*)malloc(100);
 	ifstream objectFile;
 	char* mtlLibName = (char*)malloc(100); // Will be the name of material LIB Fetched from .obj file
-
 	if ((fp = fopen(fileName, "r")) != NULL)
 	{
 		//vertex = 0;
@@ -596,9 +623,12 @@ void readInputFile(char* fileName)
 					{
 						if (strcmp(keyWord, "mtllib") == 0)
 						{
-							mtlLibName = strtok(NULL, delimiter);
-							cout << endl << "Mat lib name ::" << mtlLibName;
-							readMaterialFile(mtlLibName);
+							
+							mtlLibName=strtok(NULL, delimiter);
+							strcat(filePath, mtlLibName);
+							//puts(filePath);
+							cout << endl << "Mat lib name ::" << filePath;
+							readMaterialFile(mtlLibName);						// CHANGE TO FILE PATH ON LINUX ENV
 							//printMaterialFile(); //For Debugging
 						}
 						else if (strcmp(keyWord, "usemtl") == 0)
@@ -612,10 +642,13 @@ void readInputFile(char* fileName)
 						{
 							float xValue = atof(strtok(NULL, delimiter));
 							vertices[vertexIndex][0] = xValue;
+							sumOfX = sumOfX + xValue;
 							float yValue = atof(strtok(NULL, delimiter));
 							vertices[vertexIndex][1] = yValue;
+							sumOfY = sumOfY + yValue;
 							float zValue = atof(strtok(NULL, delimiter));
 							vertices[vertexIndex][2] = zValue;
+							sumOfZ = sumOfZ + zValue;
 							computeTheMaxAndMin(xValue, yValue, zValue);
 							vertexIndex++;
 						}
@@ -855,7 +888,10 @@ static void special(unsigned char key, int x_cord, int y_cord)
 		break;
 	case 'r':
 		
-		cameraX = 3 * maxXRange, cameraY = 3 * maxYRange, cameraZ = 3 * maxZRange;
+		cameraX = 3 * maxXRange, cameraY = 3 * maxYRange, cameraZ = maxZRange;
+		//focalX = (int)((maxXRange - minXRange) / 2);
+		//focalY = (int)((maxYRange - minYRange) / 2);
+		//focalZ = (int)((maxZRange - minZRange) / 2);
 		focalX = 0.0f, focalY = 0.0f, focalZ = 0.0f;
 		lookupX = 0.0f, lookupY = 0.0f, lookupZ = 1.0f;
 		viewUpVector = { lookupX, lookupY, lookupZ };
@@ -864,6 +900,9 @@ static void special(unsigned char key, int x_cord, int y_cord)
 		degree1 = cameraY / cameraX;
 		break;
 	case 'q':
+		exit(0);
+		break;
+	case 27: // Escape Key
 		exit(0);
 		break;
 		/*case 'x':
@@ -876,25 +915,13 @@ static void special(unsigned char key, int x_cord, int y_cord)
 }
 void reshape(int screen_width, int screen_height)
 {
-	if (screen_height == 0)
-		screen_height = 1;
-	float ratio = 1.0* screen_width / screen_height;
-
-	// Use the Projection Matrix
+	
+	glViewport(0, 0, (GLsizei)screen_width, (GLsizei)screen_height);
 	glMatrixMode(GL_PROJECTION);
-
-	// Reset Matrix
 	glLoadIdentity();
-
-	// Set the viewport to be the entire window
-	glViewport(0, 0, screen_width, screen_height);
-
-	// Set the correct perspective.
-	gluPerspective(45, ratio, 1, 1000);
-
-	// Get Back to the Modelview
+	glm::frustum(-0.1f, 0.1f, -0.1f, 0.1f, nearDist, farDist);
+	//glFrustum(-1.0, 1.0, -1.0, 1.0, nearDist, farDist);
 	glMatrixMode(GL_MODELVIEW);
-
 }
 float getRadius()
 {
@@ -912,14 +939,14 @@ void handleSpecialKeypress(int key, int x, int y)
 		degree1 = degree1 + (3.14 / 180);
 		cameraX = radius * cos(degree1);
 		cameraY = radius * sin(degree1);
-		cout << endl << radius << " " <<  degree1 << "  " << cameraX << " " << cameraY;
+		//cout << endl << radius << " " <<  degree1 << "  " << cameraX << " " << cameraY;
 		break;
 	case GLUT_KEY_RIGHT:
 		radius = getRadius();
 		degree1 = degree1 - (3.14 / 180);
 		cameraX = radius * cos(degree1);
 		cameraY = radius * sin(degree1);
-		cout << endl << degree1 << "  " << cameraX << " " << cameraY;
+		//cout << endl << degree1 << "  " << cameraX << " " << cameraY;
 		break;
 	case GLUT_KEY_UP:
 		nearDist = nearDist + 0.1f;
@@ -937,7 +964,8 @@ void handleSpecialKeypress(int key, int x, int y)
 ////////////////////////////////////////////////////////////////////////
 int main(int argc, char* argv[])
 {
-	char fileName[20];
+	char fileName[200];
+	char filePath[200];
 	glutInit(&argc, argv);
 	glutInitDisplayMode(GLUT_RGBA | GLUT_ALPHA | GLUT_DOUBLE | GLUT_DEPTH);
 	glEnable(GL_BLEND);
@@ -975,13 +1003,17 @@ int main(int argc, char* argv[])
 	for (int i = 0; i < objectNumber; i++)
 	{
 		strcpy(fileName, objectInformation[i].fileName);
-		readInputFile(fileName);
+		strcpy(filePath, objectInformation[i].path);
+		cout << "\nPath from Object :: " << objectInformation[i].path;
+		readInputFile(fileName, filePath);
 		objectInformation[i].numberOfFaces = facesValue;
 		//printVertexNormalValues();
 		//printColors();
 		// Store all values required in buffer and then rreset values in arrays
 		storeValuesInBuffer(i);
-
+		numberOfX = numberOfX + (vertexIndex);
+		numberOfY = numberOfY + (vertexIndex);
+		numberOfZ = numberOfZ + (vertexIndex);
 		//Reset the variables
 		vertexIndex = 0;
 		verticesNormalsIndex = 0;
@@ -998,10 +1030,13 @@ int main(int argc, char* argv[])
 		memset(faces, 0, sizeof(faces[0]) * _MAX_ROWS_);
 		memset(verticesColor, 0, sizeof(verticesColor[0][0]) * _MAX_ROWS_ * 3);
 	}
-	//printMaxAndMin();
+	//printMaxAndMinAndCenter();
 	cameraX = 3 * maxXRange;
-	cameraZ = 3 * maxYRange;
-	cameraY = 3 * maxZRange;
+	cameraY = 3 * maxYRange;
+	cameraZ = maxZRange;
+	//focalX = (int)((maxXRange -minXRange ) / 2);
+	//focalY = (int)((maxYRange - minYRange) / 2);
+	//focalZ = (int)((maxZRange - minZRange) / 2);
 	degree1 = cameraY / cameraX;
 	//Code to read data from File
 
@@ -1017,7 +1052,7 @@ int main(int argc, char* argv[])
 	glutDisplayFunc(display);
 	glutKeyboardFunc(special);
 	glutSpecialFunc(handleSpecialKeypress);
-	//glutReshapeFunc(reshape);
+	glutReshapeFunc(reshape);
 	glutMainLoop();
 	return 0;
 }
