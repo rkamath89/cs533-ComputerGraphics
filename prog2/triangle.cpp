@@ -21,6 +21,7 @@
 #include "glm/glm/gtx/transform.hpp"
 #include "glm/glm/gtx/rotate_vector.hpp"
 #include "glm/glm/gtc/type_ptr.hpp"
+#include "glm/glm/gtx/quaternion.hpp"
 using namespace std;
 using namespace glm;
 
@@ -397,9 +398,16 @@ void readControlFIle(char* fileName)
 					if (keyWord == NULL && rotationApplied == true)
 					{
 						rotationApplied = false;
-						objectInformation[objectNumber].transformation = glm::rotate(objectInformation[objectNumber].transformation,
-							objectInformation[objectNumber].rotationDegree,
-							vec3(objectInformation[objectNumber].rotationValueForObject.x, objectInformation[objectNumber].rotationValueForObject.y, objectInformation[objectNumber].rotationValueForObject.z));
+						quat rotationInformation;
+						rotationInformation = angleAxis(radians(objectInformation[objectNumber].rotationDegree), 
+							vec3(objectInformation[objectNumber].rotationValueForObject.x, objectInformation[objectNumber].rotationValueForObject.y,
+							objectInformation[objectNumber].rotationValueForObject.z));
+						objectInformation[objectNumber].transformation = mat4_cast(rotationInformation);
+							
+							
+						//	glm::rotate(objectInformation[objectNumber].transformation,
+						//	objectInformation[objectNumber].rotationDegree,
+						//	vec3(objectInformation[objectNumber].rotationValueForObject.x, objectInformation[objectNumber].rotationValueForObject.y, objectInformation[objectNumber].rotationValueForObject.z));
 					}
 				}
 			}
@@ -948,6 +956,12 @@ void handleSpecialKeypress(int key, int x, int y)
 	string clr;
 	switch (key)
 	{
+	case GLUT_KEY_UP:
+		nearDist = nearDist + 0.1f;
+		break;
+	case GLUT_KEY_DOWN:
+		nearDist = nearDist - 0.1f;
+		break;
 	case GLUT_KEY_LEFT:
 		radius = getRadius();
 		degree1 = degree1 + (3.14 / 180);
@@ -962,12 +976,7 @@ void handleSpecialKeypress(int key, int x, int y)
 		cameraY = radius * sin(degree1);
 		//cout << endl << degree1 << "  " << cameraX << " " << cameraY;
 		break;
-	case GLUT_KEY_UP:
-		nearDist = nearDist + 0.1f;
-		break;
-	case GLUT_KEY_DOWN:
-		nearDist = nearDist - 0.1f;
-		break;
+	
 	default: return;
 	}
 	glutPostRedisplay();
