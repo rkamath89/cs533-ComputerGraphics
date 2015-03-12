@@ -10,17 +10,17 @@
 #include "LoadShaders.h"
 #include<fstream>
 #include <string>
-#include <GL/glew.h>
+//#include <GL/glew.h>
 /* Using the GLUT library for the base windowing setup */
-#include <GL/freeglut.h>
+//#include <GL/freeglut.h>
 /* GLM */
 // #define GLM_MESSAGES
 #define GLM_FORCE_RADIANS
-#include <glm/glm/glm.hpp>
-#include <glm/glm/gtc/matrix_transform.hpp>
-#include <glm/glm/gtx/transform.hpp>
-#include <glm/glm/gtx/rotate_vector.hpp>
-#include <glm/glm/gtc/type_ptr.hpp>
+#include "glm/glm/glm.hpp"
+#include "glm/glm/gtc/matrix_transform.hpp"
+#include "glm/glm/gtx/transform.hpp"
+#include "glm/glm/gtx/rotate_vector.hpp"
+#include "glm/glm/gtc/type_ptr.hpp"
 using namespace std;
 using namespace glm;
 
@@ -66,13 +66,15 @@ struct translationObject
 	char path[200];
 	int numberOfFaces;// Number of vertices actually
 	char fileName[200];
-	float rotationDegree = 0;
+	float rotationDegree;
 	glm::vec3 rotationValueForObject;
-	int scalingEnabled = 0;
+	int scalingEnabled;
 	glm::vec3 scalingValueForObject;
-	int translationEnabled = 0;
+	int translationEnabled;
 	glm::vec3 transationValueForObject;
 	glm::mat4 transformation = mat4(1.0f);
+
+	translationObject() :rotationDegree(0), scalingEnabled(0), translationEnabled(0), transformation(mat4(1.0f)) {}
 };
 int objectNumber = -1;
 struct translationObject objectInformation[numberOfObjects];
@@ -89,19 +91,31 @@ int numberOfX = 0, numberOfY = 0, numberOfZ = 0;
 GLfloat cameraX = 0.0f, cameraY = 0.0f, cameraZ = 0.0f;
 GLfloat focalX = 0.0f, focalY = 0.0f, focalZ = 0.0f;
 GLfloat lookupX = 0.0f, lookupY = 0.0f, lookupZ = 1.0f;
-glm::vec3 viewUpVector = { lookupX, lookupY, lookupZ };
+glm::vec3 viewUpVector (lookupX, lookupY, lookupZ);
 GLfloat nearDist = 0.1f, farDist = 100.0f;
 float degree = 0, degree1 = 0;
 // Default camera values End
 
 
-vec3 lightSource = { 11.0f, 11.0f, 11.0f };
+vec3 lightSource (11.0f, 11.0f, 11.0f);
 
 
 char * delimiter = " ,'\n'";
 /////////////////////////////////////////////////////
 //  int
 /////////////////////////////////////////////////////
+
+float findMax(float number1, float number2)
+{
+	if (number1 > number2)
+	{
+		return number1;
+	}
+	else
+	{
+		return number2;
+	}
+}
 void init(void)
 {
 	degree1 = cameraY / cameraX;
@@ -142,7 +156,7 @@ void storeValuesInBuffer(int number)
 void display(void)
 {
 	int displayObject = 0;
-	glClearColor(1.0, 1.0, 1.0, 1.0);
+	//glClearColor(1.0, 1.0, 1.0, 1.0);
 	glClearDepth(GL_DEPTH_BUFFER_BIT);
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
@@ -551,7 +565,7 @@ void fillNormalArrayAndComputeColor(int size, struct materialValues fetchedMater
 	float diffuseCoefficient = getDotProduct(normalizedLight, normalizedNormal);
 
 	vec3 finalColor = vec3(fetchedMaterialValues.ka[0], fetchedMaterialValues.ka[1], fetchedMaterialValues.ka[2]) +
-								( (max(diffuseCoefficient, 0.0f)) * (vec3(fetchedMaterialValues.kd[0], fetchedMaterialValues.kd[1], fetchedMaterialValues.kd[2])));
+		((findMax(diffuseCoefficient, 0.0f)) * (vec3(fetchedMaterialValues.kd[0], fetchedMaterialValues.kd[1], fetchedMaterialValues.kd[2])));
 	for (int i = finalNormalValue; i < finalNormalValue+3; i++)
 	{
 		finalVerticesNormals[i][0] = calculatedNormal.x;
@@ -572,13 +586,13 @@ vec3 computeNormalValues(int readFaces ,struct materialValues fetchedMaterialVal
 	vec3 edge2;
 	vec3 calculatedNormal;
 
-	edge1.x = finalVertices[readFaces - 1][0] - finalVertices[readFaces - 3][0];
-	edge1.y = finalVertices[readFaces - 1][1] - finalVertices[readFaces - 3][1];
-	edge1.z = finalVertices[readFaces - 1][2] - finalVertices[readFaces - 3][2];
+	edge1.x = finalVertices[readFaces][0] - finalVertices[readFaces - 2][0];
+	edge1.y = finalVertices[readFaces][1] - finalVertices[readFaces - 2][1];
+	edge1.z = finalVertices[readFaces][2] - finalVertices[readFaces - 2][2];
 
-	edge2.x = finalVertices[readFaces - 2][0] - finalVertices[readFaces - 3][0];
-	edge2.y = finalVertices[readFaces - 2][1] - finalVertices[readFaces - 3][1];
-	edge2.z = finalVertices[readFaces - 2][2] - finalVertices[readFaces - 3][2];
+	edge2.x = finalVertices[readFaces - 1][0] - finalVertices[readFaces - 2][0];
+	edge2.y = finalVertices[readFaces - 1][1] - finalVertices[readFaces - 2][1];
+	edge2.z = finalVertices[readFaces - 1][2] - finalVertices[readFaces - 2][2];
 
 	calculatedNormal = cross(edge2, edge1);
 	//vec3 normalizedNormal = normalize(calculatedNormal);
@@ -796,7 +810,7 @@ void readInputFile(char* fileName,char* filePath)
 												foundMaterialValue.kd[0] = 0.9f, foundMaterialValue.kd[1] = 0.9f, foundMaterialValue.kd[2] = 0.9f;
 											}
 											vec3 colorComputed = vec3(foundMaterialValue.ka[0], foundMaterialValue.ka[1], foundMaterialValue.ka[2]) +
-												((max(coefficient, 0.0f)) * (vec3(foundMaterialValue.kd[0], foundMaterialValue.kd[1], foundMaterialValue.kd[2])));
+												((findMax(coefficient, 0.0f)) * (vec3(foundMaterialValue.kd[0], foundMaterialValue.kd[1], foundMaterialValue.kd[2])));
 												//float result = foundMaterialValue.kd[colPos];// foundMaterialValue.ka[colPos] + (maxValue * foundMaterialValue.kd[colPos]);
 											verticesColor[finalNormalValue][0] = colorComputed.x;
 											verticesColor[finalNormalValue][1] = colorComputed.y;
