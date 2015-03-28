@@ -6,6 +6,7 @@
 #define _CRT_SECURE_NO_DEPRECATE
 #include <iostream>
 #include <numeric>
+#include <vector>
 #include "vgl.h"
 #include "LoadShaders.h"
 #include<fstream>
@@ -46,7 +47,7 @@ GLuint  vertexIndex = 0, facesValue = 0, finalNormalValue = 0, verticesNormalsIn
 GLuint program;
 
 //enum Attrib_IDs { vPosition = 0 };
-const GLuint vPosition = 0, vertexColor = 1;
+const GLuint vPosition = 0, vertexColor = 1, kAPosition = 2, kDPosition =3, normalPosition =4;
 
 GLuint NumVertices = 0;
 GLfloat vertices[_MAX_ROWS_][3];
@@ -55,9 +56,19 @@ GLfloat finalVertices[_MAX_ROWS_][3], finalVerticesNormals[_MAX_ROWS_][3];
 GLuint faces[_MAX_ROWS_];	
 GLfloat verticesColor[_MAX_ROWS_][3];
 
+// New COde
+vector<vec3> kAValues;
+vector<vec3> kDValues;
+vector<vec3> normalValues;
+
+// End
+
 GLuint VAOs[numberOfObjects];
 GLuint Buffers[numberOfObjects];
 GLuint ColorBuffer[numberOfObjects];
+GLuint kA[numberOfObjects];
+GLuint kD[numberOfObjects];
+GLuint normals[numberOfObjects];
 
 float screen_width = 512.0f, screen_height = 512.0f;
 
@@ -131,6 +142,9 @@ void init(void)
 	glGenVertexArrays(numberOfObjects, VAOs);
 	glGenBuffers(numberOfObjects, Buffers); // Create 1 Buffer and put id in VAO's
 	glGenBuffers(numberOfObjects, ColorBuffer);
+	glGenBuffers(numberOfObjects, kA);
+	glGenBuffers(numberOfObjects, kD);
+	glGenBuffers(numberOfObjects, normals);
 
 
 }
@@ -145,8 +159,17 @@ void storeValuesInBuffer(int number)
 	glBufferData(GL_ARRAY_BUFFER, sizeof(finalVertices), finalVertices, GL_DYNAMIC_DRAW);
 	// End of vertices
 	//glGenBuffers(9, ColorBuffer);
-	glBindBuffer(GL_ARRAY_BUFFER, ColorBuffer[number]);
-	glBufferData(GL_ARRAY_BUFFER, sizeof(verticesColor), verticesColor, GL_DYNAMIC_DRAW);
+	//glBindBuffer(GL_ARRAY_BUFFER, ColorBuffer[number]);
+	//glBufferData(GL_ARRAY_BUFFER, sizeof(verticesColor), verticesColor, GL_DYNAMIC_DRAW);
+
+	glBindBuffer(GL_ARRAY_BUFFER, kA[number]);
+	glBufferData(GL_ARRAY_BUFFER, kAValues.size() * sizeof(glm::vec3), &kAValues[0], GL_DYNAMIC_DRAW);
+	
+	glBindBuffer(GL_ARRAY_BUFFER, kD[number]);
+	glBufferData(GL_ARRAY_BUFFER, kDValues.size() * sizeof(glm::vec3), &kDValues[0], GL_DYNAMIC_DRAW);
+
+	glBindBuffer(GL_ARRAY_BUFFER, normals[number]);
+	glBufferData(GL_ARRAY_BUFFER, normalValues.size() * sizeof(glm::vec3), &normalValues[0], GL_DYNAMIC_DRAW);
 	// End Of Color
 
 
@@ -196,6 +219,37 @@ void display(void)
 		glBindBuffer(GL_ARRAY_BUFFER, ColorBuffer[i]);
 		glVertexAttribPointer(
 			vertexColor, // attribute
+			3,                 // number of elements per vertex, here (R,G,B)
+			GL_FLOAT,          // the type of each element
+			GL_FALSE,          // take our values as-is
+			0,                 // no extra data between each position
+			0                  // offset of first element
+			);
+		glEnableVertexAttribArray(kAPosition);
+		glBindBuffer(GL_ARRAY_BUFFER, kA[i]);
+		glVertexAttribPointer(
+			kAPosition, // attribute
+			3,                 // number of elements per vertex, here (R,G,B)
+			GL_FLOAT,          // the type of each element
+			GL_FALSE,          // take our values as-is
+			0,                 // no extra data between each position
+			0                  // offset of first element
+			);
+		glEnableVertexAttribArray(kDPosition);
+		glBindBuffer(GL_ARRAY_BUFFER, kD[i]);
+		glVertexAttribPointer(
+			kDPosition, // attribute
+			3,                 // number of elements per vertex, here (R,G,B)
+			GL_FLOAT,          // the type of each element
+			GL_FALSE,          // take our values as-is
+			0,                 // no extra data between each position
+			0                  // offset of first element
+			);
+		
+		glEnableVertexAttribArray(normalPosition);
+		glBindBuffer(GL_ARRAY_BUFFER, normals[i]);
+		glVertexAttribPointer(
+			normalPosition, // attribute
 			3,                 // number of elements per vertex, here (R,G,B)
 			GL_FLOAT,          // the type of each element
 			GL_FALSE,          // take our values as-is
@@ -579,6 +633,11 @@ void fillNormalArrayAndComputeColor(int size, struct materialValues fetchedMater
 		finalVerticesNormals[i][0] = calculatedNormal.x;
 		finalVerticesNormals[i][1] = calculatedNormal.y;
 		finalVerticesNormals[i][2] = calculatedNormal.z;
+		
+		normalValues.push_back(vec3(calculatedNormal.x, calculatedNormal.y, calculatedNormal.z));
+		kAValues.push_back(vec3(fetchedMaterialValues.ka[0], fetchedMaterialValues.ka[1], fetchedMaterialValues.ka[2]));
+		kDValues.push_back(vec3(fetchedMaterialValues.kd[0], fetchedMaterialValues.kd[1], fetchedMaterialValues.kd[2]));
+		
 		verticesColor[i][0] = finalColor.x;// fetchedMaterialValues.kd[0];//finalColor.x;
 		verticesColor[i][1] = finalColor.y; //fetchedMaterialValues.kd[1]; //finalColor.y;
 		verticesColor[i][2] = finalColor.z; //fetchedMaterialValues.kd[2]; //finalColor.z;
@@ -787,25 +846,8 @@ void readInputFile(char* fileName,char* filePath)
 											finalVerticesNormals[finalNormalValue][0] = verticesNormal[vertexIndex][0];
 											finalVerticesNormals[finalNormalValue][1] = verticesNormal[vertexIndex][1];
 											finalVerticesNormals[finalNormalValue][2] = verticesNormal[vertexIndex][2];
-
-											//for (int colPos = 0; colPos < 3; colPos++)
-											//{
-											//	float maxValue = 0.0f;
-											//	/*float multipliedValue = dot(finalVerticesNormals[finalNormalValue][colPos], lightSource[colPos]);
-											//	if (multipliedValue > maxValue)
-											//	{
-											//		maxValue = multipliedValue;
-											//	}*/
-											//	if (materialValueFound == false)
-											//	{
-											//		//cout << endl << " No color Use Default";
-											//		strcpy(foundMaterialValue.color, "default");
-											//		foundMaterialValue.ka[0] = 0.1f, foundMaterialValue.ka[1] = 0.1f, foundMaterialValue.ka[2] = 0.1f;
-											//		foundMaterialValue.kd[0] = 0.9f, foundMaterialValue.kd[1] = 0.9f, foundMaterialValue.kd[2] = 0.9f;
-											//	}
-											//	float result = foundMaterialValue.kd[colPos];// foundMaterialValue.ka[colPos] + (maxValue * foundMaterialValue.kd[colPos]);
-											//	verticesColor[finalNormalValue][colPos] = result;
-											//}
+											normalValues.push_back(vec3(verticesNormal[vertexIndex][0], verticesNormal[vertexIndex][1], verticesNormal[vertexIndex][2]));
+											
 											float maxValue = 0.0f;
 											vec3 lightSrcNormalized = normalize(lightSource);
 											vec3 normalNormalized = normalize(vec3(finalVerticesNormals[finalNormalValue][0], finalVerticesNormals[finalNormalValue][1], finalVerticesNormals[finalNormalValue][2]));
@@ -816,7 +858,10 @@ void readInputFile(char* fileName,char* filePath)
 												strcpy(foundMaterialValue.color, "default");
 												foundMaterialValue.ka[0] = 0.1f, foundMaterialValue.ka[1] = 0.1f, foundMaterialValue.ka[2] = 0.1f;
 												foundMaterialValue.kd[0] = 0.9f, foundMaterialValue.kd[1] = 0.9f, foundMaterialValue.kd[2] = 0.9f;
+												
 											}
+											kAValues.push_back(vec3(foundMaterialValue.ka[0], foundMaterialValue.ka[1], foundMaterialValue.ka[2]));
+											kDValues.push_back(vec3(foundMaterialValue.kd[0], foundMaterialValue.kd[1], foundMaterialValue.kd[2]));
 											vec3 colorComputed = vec3(foundMaterialValue.ka[0], foundMaterialValue.ka[1], foundMaterialValue.ka[2]) +
 												((findMax(coefficient, 0.0f)) * (vec3(foundMaterialValue.kd[0], foundMaterialValue.kd[1], foundMaterialValue.kd[2])));
 												//float result = foundMaterialValue.kd[colPos];// foundMaterialValue.ka[colPos] + (maxValue * foundMaterialValue.kd[colPos]);
@@ -1052,14 +1097,15 @@ int main(int argc, char* argv[])
 		memset(finalVerticesNormals, 0, sizeof(finalVerticesNormals[0][0]) * _MAX_ROWS_ * 3);
 		memset(faces, 0, sizeof(faces[0]) * _MAX_ROWS_);
 		memset(verticesColor, 0, sizeof(verticesColor[0][0]) * _MAX_ROWS_ * 3);
+		
+		kAValues.clear();
+		kDValues.clear();
+		normalValues.clear();
 	}
 	//printMaxAndMinAndCenter();
 	cameraX = 3 * maxXRange;
 	cameraY = 3 * maxYRange;
 	cameraZ = maxZRange;
-	//focalX = (int)((maxXRange -minXRange ) / 2);
-	//focalY = (int)((maxYRange - minYRange) / 2);
-	//focalZ = (int)((maxZRange - minZRange) / 2);
 	degree1 = cameraY / cameraX;
 	//Code to read data from File
 
