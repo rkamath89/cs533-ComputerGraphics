@@ -111,7 +111,7 @@ struct translationObject
 	glm::vec3 scalingValueForObject;
 	int translationEnabled;
 	glm::vec3 transationValueForObject;
-	glm::mat4 transformation = mat4(1.0f);
+	glm::mat4 transformation;// = mat4(1.0f);
 
 	translationObject() :rotationDegree(0), scalingEnabled(0), translationEnabled(0), transformation(mat4(1.0f)) {}
 };
@@ -1180,15 +1180,33 @@ static void special(unsigned char key, int x_cord, int y_cord)
 	}
 	glutPostRedisplay();
 }
-void reshape(int screen_width, int screen_height)
+void reshape(int width, int height)
 {
 
-	glViewport(0, 0, (GLsizei)screen_width, (GLsizei)screen_height);
+	//Declare HEIGHT and WIDTH of the window as global variables and use them in glutInitWindowSize
+
+	const float ar_origin = (float)screen_width / (float)screen_height;
+	const float ar_new = (float)width / (float)height;
+
+	float scale_w = (float)width / (float)screen_width;
+	float scale_h = (float)height / (float)screen_height;
+	if (ar_new > ar_origin) {
+		scale_w = scale_h;
+	}
+	else {
+		scale_h = scale_w;
+	}
+
+	float margin_x = (width - screen_width * scale_w) / 2;
+	float margin_y = (height - screen_height * scale_h) / 2;
+
+	glViewport(margin_x, margin_y, screen_width * scale_w, screen_height * scale_h);
 	glMatrixMode(GL_PROJECTION);
 	glLoadIdentity();
-	glm::frustum(-0.1f, 0.1f, -0.1f, 0.1f, nearDist, farDist);
-	//glFrustum(-1.0, 1.0, -1.0, 1.0, nearDist, farDist);
+	glOrtho(0, screen_width / ar_origin, 0, screen_height / ar_origin, 0, 1.0);
+
 	glMatrixMode(GL_MODELVIEW);
+	glLoadIdentity();
 }
 float getRadius()
 {
