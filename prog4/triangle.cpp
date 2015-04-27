@@ -1665,7 +1665,7 @@ int main(int argc, char* argv[])
 		//cout << "\nPath from Object :: " << objectInformation[i].path;
 		readInputFile(fileName, filePath,i);
 		objectInformation[i].numberOfFaces = facesValue;
-		printObjectTextureInfo(i);
+		//printObjectTextureInfo(i);
 		//printTextureValues();
 		//printVertexNormalValues();
 		//printColors();
