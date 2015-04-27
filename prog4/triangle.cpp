@@ -91,6 +91,7 @@ vector<string> fileNames;
 // End
 
 GLuint VAOs[numberOfObjects];
+GLuint textureImages[numberOfObjects];
 GLuint Buffers[numberOfObjects];
 GLuint kABuffer[numberOfObjects];
 GLuint kDBuffer[numberOfObjects];
@@ -102,7 +103,17 @@ GLuint vertexTextureBuffer[numberOfObjects];
 
 float screen_width = 512.0f, screen_height = 512.0f;
 
-
+struct textureInfo
+{
+	string texFileName;
+	int startPos;
+	int endPos;
+	int totalVertices;
+	vec3 ambient;
+	vec3 diffuse;
+	vec3 specular;
+	float shinenesssss;
+};
 struct translationObject
 {
 	int objNumber;
@@ -121,13 +132,14 @@ struct translationObject
 	glm::vec3 transationValueForObject;
 	glm::mat4 transformation;// = mat4(1.0f);
 	string imageName;
+	vector<textureInfo> texInfoForObject;
 
 	translationObject() :rotationDegree(0), scalingEnabled(0), translationEnabled(0), transformation(mat4(1.0f)) {}
 };
 int objectNumber = -1;
 struct translationObject objectInformation[numberOfObjects];
 
-
+GLint uniformEnable;
 GLint uniform_mvp;
 GLint uniform_mv;
 GLint uniform_model;
@@ -247,6 +259,20 @@ void printContentsOfLightObject()
 		cout << endl;
 	}
 }
+void printObjectTextureInfo(int objNum)
+{
+	if (objectInformation[objNum].texInfoForObject.size() > 0)
+	{
+		for (int i = 0; i < objectInformation[objNum].texInfoForObject.size(); i++)
+		{
+			cout << endl << "Start :: " << objectInformation[objNum].texInfoForObject[i].startPos
+				<< "End :: " << objectInformation[objNum].texInfoForObject[i].endPos
+				<< "Total :: " << objectInformation[objNum].texInfoForObject[i].totalVertices
+				<< "FileName :: " << objectInformation[objNum].texInfoForObject[i].texFileName;
+		}
+		cout << endl;
+	}
+}
 void init(void)
 {
 	degree1 = cameraY / cameraX;
@@ -266,6 +292,7 @@ void init(void)
 	specular_uniform = glGetUniformLocation(program, "specular_uniform");
 	shininess_uniform = glGetUniformLocation(program, "shininess_uniform");
 	texLoc = glGetUniformLocation(program, "tex");
+	uniformEnable = glGetUniformLocation(program, "enableColor");
 
 	glGenVertexArrays(numberOfObjects, VAOs);
 	glGenBuffers(numberOfObjects, Buffers); // Create 1 Buffer and put id in VAO's
@@ -275,7 +302,9 @@ void init(void)
 	glGenBuffers(numberOfObjects, shininessBuffer);
 	glGenBuffers(numberOfObjects, normalsBuffer);
 	glGenBuffers(numberOfObjects, vertexBuffer);
+	glGenTextures(numberOfObjects, textureImages);
 	glGenBuffers(numberOfObjects, vertexTextureBuffer);
+
 
 
 }
@@ -352,10 +381,11 @@ void display(void)
 		const char* fileNameTeture = objectInformation[i].imageName.c_str();
 		char textureFile[100];
 		strcpy(textureFile, fileNameTeture);
-		success = loadTexture(textureFile, true);
+		/*glEnable(GL_TEXTURE_2D);
+		success = loadTexture(textureFile, true,i);
 		if (!success)
-			cerr << "error reading mandrill.png" << endl;
-
+			cerr << "error reading File" << endl;
+*/
 
 		glUniform3fv(ambient_uniform, 1, &objectInformation[i].ambientValue[0]);
 		glUniform3fv(diffuse_uniform, 1, &objectInformation[i].diffuseValue[0]);
@@ -431,15 +461,41 @@ void display(void)
 		glEnableVertexAttribArray(vertexTexturePosition);
 		glBindBuffer(GL_ARRAY_BUFFER, vertexTextureBuffer[i]);
 		glVertexAttribPointer(vertexTexturePosition, 2, GL_FLOAT, GL_FALSE, 0, 0);
+		
+		for (int texInfo = 0; texInfo < objectInformation[i].texInfoForObject.size(); texInfo++)
+		{
+			const char* fileNameTeture = objectInformation[i].texInfoForObject[texInfo].texFileName.c_str();
+			char textureFile[100];
+			strcpy(textureFile, fileNameTeture);
+			if (strcmp(textureFile, "dummy") != 0)
+			{
+				glEnable(GL_TEXTURE_2D);
+				glActiveTexture(GL_TEXTURE0 + texInfo);
+				success = loadTexture(textureFile, true);
+				glUniform1i(texLoc, texInfo);
+				if (!success)
+					cerr << "error reading File" << endl;
+			}
+			else
+			{
+				glUniform1i(uniformEnable,1);
+				glUniform3fv(ambient_uniform, 1, &objectInformation[i].texInfoForObject[texInfo].ambient[0]);
+				glUniform3fv(diffuse_uniform, 1, &objectInformation[i].texInfoForObject[texInfo].diffuse[0]);
+				glUniform3fv(specular_uniform, 1, &objectInformation[i].texInfoForObject[texInfo].specular[0]);
+				glUniform1f(shininess_uniform, objectInformation[i].texInfoForObject[texInfo].shinenesssss);
+			}
+			glDrawArrays(GL_TRIANGLES, objectInformation[i].texInfoForObject[texInfo].startPos, objectInformation[i].texInfoForObject[texInfo].totalVertices);
+			glUniform1i(uniformEnable, 2);
+			glDisable(GL_TEXTURE_2D);
+		}
 
 
-
-		glDrawArrays(GL_TRIANGLES, 0, objectInformation[i].numberOfFaces);
+		//glDrawArrays(GL_TRIANGLES, 0, objectInformation[i].numberOfFaces);
 		glDisableVertexAttribArray(vPosition);
 		glDisableVertexAttribArray(kAPosition);
 		glDisableVertexAttribArray(kDPosition);
 		glDisableVertexAttribArray(normalPosition);
-		//glDisableVertexAttribArray(vertexTexturePosition);
+		glDisableVertexAttribArray(vertexTexturePosition);
 
 
 	}
@@ -970,7 +1026,7 @@ vec3 computeNormalValues(int readFaces, struct materialValues fetchedMaterialVal
 	return calculatedNormal;
 }
 
-void readInputFile(char* fileName, char* filePath)
+void readInputFile(char* fileName, char* filePath, int objNumber)
 {
 	FILE * fp;
 	bool materialValueFound = false;
@@ -981,6 +1037,7 @@ void readInputFile(char* fileName, char* filePath)
 	lineRead = (char*)malloc(100);
 	ifstream objectFile;
 	char* mtlLibName = (char*)malloc(100); // Will be the name of material LIB Fetched from .obj file
+	
 	if ((fp = fopen(fileName, "r")) != NULL)
 	{
 		//vertex = 0;
@@ -989,6 +1046,8 @@ void readInputFile(char* fileName, char* filePath)
 		int  normalForFace = 0, getNormalForFacePos = 0;
 		struct materialValues foundMaterialValue;
 		char * colorName;
+		int startTex = -1, endTex = 0;
+		bool firstTime = true;
 		while (!feof(fp))
 		{
 			fgets(lineRead, 50, fp);
@@ -1011,6 +1070,27 @@ void readInputFile(char* fileName, char* filePath)
 						}
 						else if (strcmp(keyWord, "usemtl") == 0)
 						{
+							if (startTex != -1)
+							{
+								struct textureInfo tempInfo;
+								tempInfo.startPos = startTex;
+								tempInfo.endPos = endTex;
+								tempInfo.totalVertices = endTex - startTex;
+								tempInfo.texFileName = foundMaterialValue.mapKd;
+								tempInfo.shinenesssss = foundMaterialValue.shininess;
+								tempInfo.ambient = vec3(foundMaterialValue.ka[0], foundMaterialValue.ka[1], foundMaterialValue.ka[2]);
+								tempInfo.diffuse = vec3(foundMaterialValue.kd[0], foundMaterialValue.kd[1], foundMaterialValue.kd[2]);
+								tempInfo.specular = vec3(foundMaterialValue.ks[0], foundMaterialValue.ks[1], foundMaterialValue.ks[2]);
+								tempInfo.shinenesssss = foundMaterialValue.shininess;
+
+								objectInformation[objNumber].texInfoForObject.push_back(tempInfo);
+								startTex = endTex;
+							}
+							if (firstTime)
+							{
+								firstTime = false;
+								startTex = 0;
+							}
 							colorName = strtok(NULL, delimiter);
 							foundMaterialValue = getDetailsOfMaterial(colorName);
 							materialValueFound = true;
@@ -1146,6 +1226,7 @@ void readInputFile(char* fileName, char* filePath)
 												}
 											}
 											facesValue++;
+											endTex++;
 											i = i + length;
 										}
 										else if (positionOfSlash == 1)
@@ -1229,6 +1310,26 @@ void readInputFile(char* fileName, char* filePath)
 				}
 			}
 		}
+		if (startTex != -1)
+		{
+			struct textureInfo tempInfo;
+			tempInfo.startPos = startTex;
+			tempInfo.endPos = endTex;
+			tempInfo.totalVertices = endTex - startTex;
+			tempInfo.texFileName = foundMaterialValue.mapKd;
+			tempInfo.shinenesssss = foundMaterialValue.shininess;
+			tempInfo.ambient = vec3(foundMaterialValue.ka[0], foundMaterialValue.ka[1], foundMaterialValue.ka[2]);
+			tempInfo.diffuse = vec3(foundMaterialValue.kd[0], foundMaterialValue.kd[1], foundMaterialValue.kd[2]);
+			tempInfo.specular = vec3(foundMaterialValue.ks[0], foundMaterialValue.ks[1], foundMaterialValue.ks[2]);
+
+			objectInformation[objNumber].texInfoForObject.push_back(tempInfo);
+			startTex = endTex;
+		}
+		if (firstTime)
+		{
+			firstTime = false;
+			startTex = 0;
+		}
 		NumVertices = vertexIndex;// To keep Track of Number of Vertices , default is 0 . array is constructed using 300x3
 
 	}
@@ -1241,7 +1342,7 @@ void readInputFile(char* fileName, char* filePath)
 
 static void special(unsigned char key, int x_cord, int y_cord)
 {
-	cout << " kEY :: " << key << endl;
+	//cout << " kEY :: " << key << endl;
 	string clr;
 	switch (key)
 	{
@@ -1341,7 +1442,7 @@ float getRadius()
 void handleSpecialKeypress(int key, int x, int y)
 {
 	float radius;
-	cout << " special kEY :: " << key << endl;
+	//cout << " special kEY :: " << key << endl;
 	string clr;
 	switch (key)
 	{
@@ -1562,9 +1663,9 @@ int main(int argc, char* argv[])
 		strcpy(fileName, objectInformation[i].fileName);
 		strcpy(filePath, objectInformation[i].path);
 		//cout << "\nPath from Object :: " << objectInformation[i].path;
-		readInputFile(fileName, filePath);
+		readInputFile(fileName, filePath,i);
 		objectInformation[i].numberOfFaces = facesValue;
-
+		printObjectTextureInfo(i);
 		//printTextureValues();
 		//printVertexNormalValues();
 		//printColors();
