@@ -1,0 +1,6 @@
+obj shark.obj
+rx 90.
+s .3 .3 .3
+light directional ambient 0.2 0.2 0.2 color 1. 0. 0. position 0. 1. 0.
+
+view  camera 3. 3. 2.  focal 0. 0. 0.  viewup 0. 0. 1.

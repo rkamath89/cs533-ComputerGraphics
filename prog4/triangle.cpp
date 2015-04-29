@@ -157,7 +157,7 @@ GLfloat cameraX = 0.0f, cameraY = 0.0f, cameraZ = 0.0f;
 GLfloat focalX = 0.0f, focalY = 0.0f, focalZ = 0.0f;
 GLfloat lookupX = 0.0f, lookupY = 0.0f, lookupZ = 1.0f;
 glm::vec3 viewUpVector(lookupX, lookupY, lookupZ);
-GLfloat nearDist = 0.1f, farDist = 200.0f;
+GLfloat nearDist = 0.1f, farDist = 100.0f;
 float degree = 0, degree1 = 0;
 // Default camera values End
 
@@ -350,7 +350,7 @@ void storeValuesInBuffer(int number)
 ////////////////////////////////////////////////////////////////////
 //	display
 ////////////////////////////////////////////////////////////////////
-void display(void)
+void displayfun(void)
 {
 	int displayObject = 0;
 	glClearColor(0.0, 0.0, 1.0, 1.0);
@@ -488,7 +488,10 @@ void display(void)
 			glUniform1i(uniformEnable, 2);
 			glDisable(GL_TEXTURE_2D);
 		}
-
+		if (objectInformation[i].texInfoForObject.size() == 0)
+		{
+			glDrawArrays(GL_TRIANGLES, 0, objectInformation[i].numberOfFaces);
+		}
 
 		//glDrawArrays(GL_TRIANGLES, 0, objectInformation[i].numberOfFaces);
 		glDisableVertexAttribArray(vPosition);
@@ -1714,7 +1717,7 @@ int main(int argc, char* argv[])
 	// End
 
 	// Handle display seperately , put a loop of objectInformation inside that and store facesValue as part of objecctinformation
-	glutDisplayFunc(display);
+	glutDisplayFunc(displayfun);
 	glutKeyboardFunc(special);
 	glutSpecialFunc(handleSpecialKeypress);
 	glutReshapeFunc(reshape);

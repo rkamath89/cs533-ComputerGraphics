@@ -1,0 +1,24 @@
+obj spongebob.obj
+s 1 1 1
+rz 90
+rx 190
+ry 180
+t 1.2 0 0
+
+obj patrick.obj
+s 1 1 1
+rz 90
+rx 190
+t -1.2 0 0
+
+obj mr_krab.obj
+s .1 .1 .1
+rz 90
+rx 190
+
+light directional ambient 1.2 1.2 1.2 color 1. 1. 1. position 0. 1. 0.
+light spot ambient 1. 1. 1. color 1. 0. 0. position 0. 1. 0. constAtt 0.001 linearAtt 0.001 quadAtt .002 
+coneDirection 0. 1. 0. spotCosCutoff .867 spotExponent 25.
+light local ambient 1. 1. 1. color 1. 1. 1. position 5. 5. 0. constAtt 0.2 linearAtt 0.2 quadAtt .002
+
+view  camera 4.16 0.83 2.0  focal 0. 0. 0. viewup 0.56 -0.80 0.15

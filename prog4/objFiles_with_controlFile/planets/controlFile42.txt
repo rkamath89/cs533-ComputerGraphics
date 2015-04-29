@@ -1,0 +1,16 @@
+obj earth.obj
+rx 90
+s 2 2 2
+
+obj moon.obj
+s .25 .25 .25
+t 13 0 1
+
+light directional ambient .1 .1 .1 color 1. 1. 1. position 0. 1. 0.
+
+light directional ambient .1 .1 .1 color .7 .7 .7 position 0. 0. 1.
+
+light directional ambient .1 .1 .1 color 1. 1. 1. position -1. -1. 1.
+light directional ambient .1 .1 .1 color 1. 1. 1. position -1. -1. -1.
+
+view camera 4. 4. 2. focal 0. 0. 0. viewup 0. 0. 1.
